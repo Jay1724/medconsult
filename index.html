@@ -639,7 +639,7 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
         <div class="auth-field"><label>Email Address</label><input type="email" id="l-email" placeholder="dr.name@practice.co.za"></div>
         <div class="auth-field"><label>Password</label><input type="password" id="l-pass" placeholder="••••••••"></div>
         <button class="auth-btn" onclick="doLogin()">Sign In →</button>
-        <div class="auth-note" onclick="switchAuth('signup')">Don't have an account? <span>Create one — first month free</span></div>
+        <div class="auth-note" onclick="switchAuth('signup')">Don't have an account? <span>Create one — 7 days free</span></div>
       </div>
 
       <!-- SIGNUP -->
@@ -714,7 +714,7 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
             </div>
             <div class="auth-field"><label>Name on Card</label><input type="text" id="su-cname" placeholder="DR JANE ROBERTS"></div>
           </div>
-          <div class="auth-secure">🔒 Payments processed securely · First month free · Cancel anytime</div>
+          <div class="auth-secure">🔒 Payments processed securely · 7 days free · Cancel anytime</div>
           <div style="display:flex;gap:10px">
             <button class="auth-btn auth-btn-ghost" style="flex:0 0 auto;width:auto;padding:11px 18px" onclick="ssGo(2)">← Back</button>
             <button class="auth-btn" style="flex:1" onclick="doSignup()">🎉 Start Free Trial</button>
@@ -1186,7 +1186,33 @@ function seed() {
 function switchAuth(m) {
   ['login','signup'].forEach((v,i) => { document.getElementById('auth-'+v).style.display = v===m?'block':'none'; document.querySelectorAll('.auth-tab')[i].classList.toggle('active',v===m); });
 }
-function ssGo(n) { [1,2,3].forEach(i => document.getElementById('ss'+i).style.display = i===n?'block':'none'); }
+function ssGo(n) {
+  if (n === 2) {
+    const fn = document.getElementById('su-fn').value.trim();
+    const ln = document.getElementById('su-ln').value.trim();
+    const em = document.getElementById('su-email').value.trim();
+    const pw = document.getElementById('su-pw').value;
+    const hpcsa = document.getElementById('su-hpcsa').value.trim();
+    const pracnum = document.getElementById('su-pracnum').value.trim();
+    if (!fn) { toast('Please enter your first name', 'error'); return; }
+    if (!ln) { toast('Please enter your last name', 'error'); return; }
+    if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { toast('Please enter a valid email address', 'error'); return; }
+    if (!pw || pw.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
+    if (!hpcsa) { toast('Please enter your HPCSA number', 'error'); return; }
+    if (!pracnum) { toast('Please enter your practice number', 'error'); return; }
+  }
+  if (n === 3) {
+    const pname = document.getElementById('su-pname').value.trim();
+    const paddr = document.getElementById('su-paddr').value.trim();
+    const pphone = document.getElementById('su-pphone').value.trim();
+    const bank = document.getElementById('su-bank').value.trim();
+    if (!pname) { toast('Please enter your practice name', 'error'); return; }
+    if (!paddr) { toast('Please enter your practice address', 'error'); return; }
+    if (!pphone) { toast('Please enter your practice phone number', 'error'); return; }
+    if (!bank) { toast('Please enter your bank account details', 'error'); return; }
+  }
+  [1,2,3].forEach(i => document.getElementById('ss'+i).style.display = i===n?'block':'none');
+}
 function selPlan(p) { selPlanVal=p; ['starter','pro'].forEach(k => document.getElementById('pc-'+k).classList.toggle('selected',k===p)); }
 function fmtCard(el) { let v=el.value.replace(/\D/g,'').substring(0,16); el.value=v.replace(/(.{4})/g,'$1 ').trim(); }
 function fmtExp(el) { let v=el.value.replace(/\D/g,'').substring(0,4); if(v.length>=3)v=v.substring(0,2)+' / '+v.substring(2); el.value=v; }
@@ -1224,6 +1250,14 @@ async function doSignup() {
   const em = document.getElementById('su-email').value.trim();
   const pw = document.getElementById('su-pw').value;
   if (!fn || !ln || !em || !pw) { toast('Please fill all required fields', 'error'); return; }
+  const card = document.getElementById('su-card').value.replace(/\s/g,'');
+  const exp = document.getElementById('su-exp').value.trim();
+  const cvv = document.getElementById('su-cvv').value.trim();
+  const cname = document.getElementById('su-cname').value.trim();
+  if (!card || card.length < 16) { toast('Please enter a valid card number', 'error'); return; }
+  if (!exp || exp.length < 7) { toast('Please enter the card expiry date', 'error'); return; }
+  if (!cvv || cvv.length < 3) { toast('Please enter the CVV', 'error'); return; }
+  if (!cname) { toast('Please enter the name on your card', 'error'); return; }
   const meta = {
     name: `Dr. ${fn} ${ln}`, fn, ln,
     spec: document.getElementById('su-spec').value,
