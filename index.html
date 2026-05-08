@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MedConsult — Doctor Platform</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 /* ── DESIGN TOKENS ──────────────────────────────────────── */
 :root {
@@ -1139,6 +1140,7 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
 // ══════════════════════════════════════════════════
 const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
+const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ══════════════════════════════════════════════════
 //  APP STATE
@@ -1189,18 +1191,63 @@ function selPlan(p) { selPlanVal=p; ['starter','pro'].forEach(k => document.getE
 function fmtCard(el) { let v=el.value.replace(/\D/g,'').substring(0,16); el.value=v.replace(/(.{4})/g,'$1 ').trim(); }
 function fmtExp(el) { let v=el.value.replace(/\D/g,'').substring(0,4); if(v.length>=3)v=v.substring(0,2)+' / '+v.substring(2); el.value=v; }
 
-function doLogin() {
-  const e=document.getElementById('l-email').value.trim();
-  if(!e){toast('Please enter your email','error');return}
-  S.doc={name:'Dr. Roberts',fn:'Jane',ln:'Roberts',spec:'General Practitioner',hpcsa:'MP0123456',pracnum:'0123456',pracName:'Roberts Family Practice',pracAddr:'123 Medical Centre, Sandton, Johannesburg, 2196',phone:'+27 11 123 4567',vat:'4123456789',bank:'FNB, Acc: 62123456, Branch: 250655',sig:'Dr. Jane Roberts',email:e};
-  S.plan='pro'; launchApp();
+function docFromMeta(meta, email) {
+  return {
+    name: meta.name || `Dr. ${email}`,
+    fn: meta.fn || '', ln: meta.ln || '',
+    spec: meta.spec || 'General Practitioner',
+    hpcsa: meta.hpcsa || '', pracnum: meta.pracnum || '',
+    pracName: meta.pracName || '', pracAddr: meta.pracAddr || '',
+    phone: meta.phone || '', vat: meta.vat || '',
+    bank: meta.bank || '', sig: meta.sig || '',
+    email
+  };
 }
-function doSignup() {
-  const fn=document.getElementById('su-fn').value.trim(), ln=document.getElementById('su-ln').value.trim(), em=document.getElementById('su-email').value.trim();
-  if(!fn||!ln||!em){toast('Please fill required fields','error');return}
-  S.doc={name:`Dr. ${fn} ${ln}`,fn,ln,spec:document.getElementById('su-spec').value,hpcsa:document.getElementById('su-hpcsa').value,pracnum:document.getElementById('su-pracnum').value,pracName:document.getElementById('su-pname').value||`${ln} Medical Practice`,pracAddr:document.getElementById('su-paddr').value||'Address not set',phone:document.getElementById('su-pphone').value,vat:document.getElementById('su-vat').value,bank:document.getElementById('su-bank').value,sig:document.getElementById('su-sig').value||`Dr. ${fn} ${ln}`,email:em};
-  S.plan=selPlanVal; launchApp(); toast('Welcome! Your 30-day free trial has started.','success');
+
+async function doLogin() {
+  const e = document.getElementById('l-email').value.trim();
+  const p = document.getElementById('l-pass').value;
+  if (!e || !p) { toast('Please enter your email and password', 'error'); return; }
+  const btn = document.querySelector('#auth-login .auth-btn');
+  btn.textContent = 'Signing in…'; btn.disabled = true;
+  const { data, error } = await sbClient.auth.signInWithPassword({ email: e, password: p });
+  btn.textContent = 'Sign In →'; btn.disabled = false;
+  if (error) { toast(error.message, 'error'); return; }
+  S.doc = docFromMeta(data.user.user_metadata, e);
+  S.plan = data.user.user_metadata.plan || 'pro';
+  launchApp();
 }
+
+async function doSignup() {
+  const fn = document.getElementById('su-fn').value.trim();
+  const ln = document.getElementById('su-ln').value.trim();
+  const em = document.getElementById('su-email').value.trim();
+  const pw = document.getElementById('su-pw').value;
+  if (!fn || !ln || !em || !pw) { toast('Please fill all required fields', 'error'); return; }
+  const meta = {
+    name: `Dr. ${fn} ${ln}`, fn, ln,
+    spec: document.getElementById('su-spec').value,
+    hpcsa: document.getElementById('su-hpcsa').value,
+    pracnum: document.getElementById('su-pracnum').value,
+    pracName: document.getElementById('su-pname').value || `${ln} Medical Practice`,
+    pracAddr: document.getElementById('su-paddr').value || 'Address not set',
+    phone: document.getElementById('su-pphone').value,
+    vat: document.getElementById('su-vat').value,
+    bank: document.getElementById('su-bank').value,
+    sig: document.getElementById('su-sig').value || `Dr. ${fn} ${ln}`,
+    plan: selPlanVal
+  };
+  const btn = document.querySelector('#ss3 .auth-btn:last-child');
+  btn.textContent = 'Creating account…'; btn.disabled = true;
+  const { data, error } = await sbClient.auth.signUp({ email: em, password: pw, options: { data: meta } });
+  btn.textContent = '🎉 Start Free Trial'; btn.disabled = false;
+  if (error) { toast(error.message, 'error'); return; }
+  S.doc = docFromMeta(meta, em);
+  S.plan = selPlanVal;
+  launchApp();
+  toast('Welcome! Your 30-day free trial has started.', 'success');
+}
+
 function launchApp() {
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-sidebar').style.display='flex';
@@ -1212,7 +1259,25 @@ function launchApp() {
   document.getElementById('sb-plan').textContent=S.plan==='pro'?'PRO':'STARTER';
   popSelects(); renderDash(); initSigs(); renderSub();
 }
-function doLogout(){if(!confirm('Sign out of MedConsult?'))return;document.getElementById('auth-screen').style.display='flex';document.getElementById('app-sidebar').style.display='none';document.getElementById('app-main').style.display='none';}
+
+async function doLogout() {
+  if (!confirm('Sign out of MedConsult?')) return;
+  await sbClient.auth.signOut();
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('app-sidebar').style.display='none';
+  document.getElementById('app-main').style.display='none';
+}
+
+// Restore session on page load
+(async () => {
+  const { data: { session } } = await sbClient.auth.getSession();
+  if (session) {
+    const meta = session.user.user_metadata;
+    S.doc = docFromMeta(meta, session.user.email);
+    S.plan = meta.plan || 'pro';
+    launchApp();
+  }
+})();
 
 // ══════════════════════════════════════════════════
 //  NAVIGATION
