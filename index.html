@@ -319,7 +319,9 @@ a { text-decoration: none; color: inherit; }
 .stat-card {
   background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: 20px; box-shadow: var(--shadow-sm); position: relative; overflow: hidden;
+  cursor: pointer; transition: all 0.2s;
 }
+.stat-card:hover { border-color: var(--azure); box-shadow: 0 0 0 2px var(--azure-dim); transform: translateY(-1px); }
 .stat-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--azure); border-radius: 2px 2px 0 0; }
 .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--ink2); margin-bottom: 8px; font-weight: 600; }
 .stat-value { font-family: 'Playfair Display', serif; font-size: 34px; color: var(--ink); line-height: 1; }
@@ -777,10 +779,10 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
     <!-- DASHBOARD -->
     <div class="page active" id="pg-dashboard">
       <div class="stats-grid">
-        <div class="stat-card"><div class="stat-label">Total Patients</div><div class="stat-value" id="s-patients">0</div><div class="stat-delta up">↑ 3 this month</div></div>
-        <div class="stat-card"><div class="stat-label">Today's Appointments</div><div class="stat-value">4</div><div class="stat-delta">2 video · 2 in-person</div></div>
-        <div class="stat-card"><div class="stat-label">Pending Invoices</div><div class="stat-value" id="s-invoices">0</div><div class="stat-delta">R 12,450 outstanding</div></div>
-        <div class="stat-card"><div class="stat-label">Docs Issued</div><div class="stat-value" id="s-docs">0</div><div class="stat-delta up">This month</div></div>
+        <div class="stat-card" onclick="nav('patients',document.querySelector('[onclick*=patients]'))"><div class="stat-label">Total Patients</div><div class="stat-value" id="s-patients">0</div><div class="stat-delta up">↑ 3 this month</div></div>
+        <div class="stat-card" onclick="nav('consultations',document.querySelector('[onclick*=consultations]'))"><div class="stat-label">Today's Appointments</div><div class="stat-value">4</div><div class="stat-delta">2 video · 2 in-person</div></div>
+        <div class="stat-card" onclick="nav('invoices',document.querySelector('[onclick*=invoices]'))"><div class="stat-label">Pending Invoices</div><div class="stat-value" id="s-invoices">0</div><div class="stat-delta">R 12,450 outstanding</div></div>
+        <div class="stat-card" onclick="nav('sicknotes',document.querySelector('[onclick*=sicknotes]'))"><div class="stat-label">Docs Issued</div><div class="stat-value" id="s-docs">0</div><div class="stat-delta up">This month</div></div>
       </div>
       <div class="qa-grid">
         <div class="qa-card" onclick="nav('consultations',document.querySelector('[onclick*=consultations]'))"><div class="qa-icon">📹</div><div class="qa-label">Consultation</div><div class="qa-sub">WhatsApp Video</div></div>
