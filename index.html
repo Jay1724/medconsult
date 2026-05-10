@@ -604,6 +604,44 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
 /* ════ RESPONSIVE ════ */
 @media (max-width: 1100px) { .stats-grid { grid-template-columns: 1fr 1fr; } .qa-grid { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 860px) { .consult-grid { grid-template-columns: 1fr; } }
+
+/* ════ CALENDAR ════ */
+.cal-layout { display: grid; grid-template-columns: 1fr 300px; gap: 20px; }
+.cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.cal-month { font-family: 'Playfair Display', serif; font-size: 20px; color: var(--ink); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.cal-dow { background: var(--grey-50); padding: 8px 4px; text-align: center; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--ink2); }
+.cal-day { background: var(--white); padding: 7px; min-height: 88px; cursor: pointer; transition: background 0.15s; }
+.cal-day:hover { background: var(--azure-dim); }
+.cal-day.other-month { background: var(--grey-50); }
+.cal-day.other-month .cal-day-num { color: var(--ink3); }
+.cal-day.today .cal-day-num { background: var(--azure); color: var(--white); border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.cal-day.selected { background: var(--azure-dim); outline: 2px solid var(--azure); outline-offset: -2px; }
+.cal-day-num { font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+.cal-pill { border-radius: 3px; font-size: 9px; padding: 1px 4px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--azure-dim); color: var(--azure); }
+.cal-pill.video { background: rgba(22,163,74,0.12); color: var(--success); }
+.cal-pill.phone { background: rgba(217,119,6,0.12); color: var(--warning); }
+.cal-panel { background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); display: flex; flex-direction: column; overflow: hidden; min-height: 500px; }
+.cal-panel-hd { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.cal-panel-title { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--ink); }
+.cal-panel-sub { font-size: 12px; color: var(--ink2); margin-top: 2px; }
+.cal-panel-body { padding: 14px; flex: 1; overflow-y: auto; }
+.appt-item { padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 10px; border-left: 3px solid var(--azure); }
+.appt-item.video { border-left-color: var(--success); }
+.appt-item.phone { border-left-color: var(--warning); }
+.appt-time { font-size: 11px; font-weight: 600; color: var(--ink2); margin-bottom: 3px; font-family: 'JetBrains Mono', monospace; }
+.appt-patient { font-size: 13px; font-weight: 600; color: var(--ink); }
+.appt-meta { font-size: 11px; color: var(--ink2); margin-top: 3px; display: flex; align-items: center; justify-content: space-between; }
+.appt-badge { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: var(--grey-100); color: var(--ink2); }
+.appt-empty { text-align: center; color: var(--ink2); font-size: 13px; padding: 48px 20px; }
+.avail-row { display: grid; grid-template-columns: 80px 36px 1fr 1fr 100px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.avail-row:last-child { border-bottom: none; }
+.avail-label { font-size: 13px; font-weight: 600; color: var(--ink); }
+.avail-toggle { width: 36px; height: 20px; border-radius: 10px; border: none; cursor: pointer; transition: background 0.2s; flex-shrink: 0; }
+.avail-toggle.on { background: var(--azure); }
+.avail-toggle.off { background: var(--grey-300); }
+.avail-inputs select, .avail-inputs input { padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; color: var(--ink); outline: none; width: 100%; }
+.avail-inputs select:focus, .avail-inputs input:focus { border-color: var(--azure); box-shadow: 0 0 0 3px var(--azure-dim); }
 </style>
 </head>
 <body>
@@ -741,6 +779,7 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
     <div class="nav-group-label">Overview</div>
     <div class="nav-item active" onclick="nav('dashboard',this)"><span class="nav-icon">🏠</span> Dashboard</div>
     <div class="nav-item" onclick="nav('consultations',this)"><span class="nav-icon">📹</span> Consultations <span class="nav-badge">3</span></div>
+    <div class="nav-item" onclick="nav('calendar',this)"><span class="nav-icon">📅</span> Calendar</div>
     <div class="nav-group-label">Patients</div>
     <div class="nav-item" onclick="nav('patients',this)"><span class="nav-icon">👥</span> All Patients</div>
     <div class="nav-item" onclick="nav('records',this)"><span class="nav-icon">📋</span> Medical Records</div>
@@ -866,6 +905,36 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
       <div class="card"><div class="card-header"><div class="card-title">Medical Aid Claims</div></div><div class="table-wrap"><table><thead><tr><th>Claim Ref</th><th>Patient</th><th>Medical Aid</th><th>ICD-10</th><th>Amount</th><th>Submitted</th><th>Status</th></tr></thead><tbody id="cl-body"></tbody></table></div></div>
     </div>
 
+    <!-- CALENDAR -->
+    <div class="page" id="pg-calendar">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div style="font-size:13px;color:var(--ink2)">Your monthly schedule</div>
+        <button class="btn btn-ghost btn-sm" onclick="openAvailability()">⚙ Set Availability</button>
+      </div>
+      <div class="cal-layout">
+        <div class="card" style="padding:20px">
+          <div class="cal-header">
+            <div style="display:flex;align-items:center;gap:10px">
+              <button class="btn btn-ghost btn-sm" onclick="calMove(-1)">‹</button>
+              <div class="cal-month" id="cal-month-label"></div>
+              <button class="btn btn-ghost btn-sm" onclick="calMove(1)">›</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="calToday()">Today</button>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+        <div class="cal-panel">
+          <div class="cal-panel-hd">
+            <div class="cal-panel-title" id="cal-panel-title">Select a day</div>
+            <div class="cal-panel-sub" id="cal-panel-sub"></div>
+          </div>
+          <div class="cal-panel-body" id="cal-panel-body">
+            <div class="appt-empty">← Click a day to view appointments</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- SUBSCRIPTION -->
     <div class="page" id="pg-subscription">
       <div class="sub-hero"><div class="sub-hero-text"><h2>Your Subscription</h2><p>Manage your plan, billing and payment details</p></div><div class="sub-status" id="sub-badge">PRO — Active</div></div>
@@ -882,6 +951,31 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
 <!-- ══════════════════════════════════════════════════════════
      MODALS
 ══════════════════════════════════════════════════════════ -->
+
+<!-- AVAILABILITY -->
+<div class="overlay" id="m-availability">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hd">
+      <div class="modal-title">Set Working Hours</div>
+      <button class="modal-close" onclick="closeM('m-availability')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--ink2);margin-bottom:16px">Configure when you're available for appointments. Toggle days on or off.</div>
+      <div style="display:grid;grid-template-columns:80px 36px 1fr 1fr 110px;gap:10px;margin-bottom:8px">
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--ink2)">Day</div>
+        <div></div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--ink2)">Start</div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--ink2)">End</div>
+        <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--ink2)">Slot (min)</div>
+      </div>
+      <div id="avail-rows"></div>
+      <div class="form-actions">
+        <button class="btn btn-ghost" onclick="closeM('m-availability')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveAvailability()">Save Availability</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ADD/EDIT PATIENT -->
 <div class="overlay" id="m-patient">
@@ -1327,10 +1421,11 @@ function nav(pg, el) {
   document.getElementById('pg-'+pg).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
-  const titles={dashboard:'Dashboard',consultations:'Consultations',patients:'All Patients',records:'Medical Records',sicknotes:'Sick Notes',scripts:'Prescriptions',invoices:'Invoices',claims:'Medical Aid Claims',subscription:'Subscription'};
+  const titles={dashboard:'Dashboard',consultations:'Consultations',calendar:'Calendar',patients:'All Patients',records:'Medical Records',sicknotes:'Sick Notes',scripts:'Prescriptions',invoices:'Invoices',claims:'Medical Aid Claims',subscription:'Subscription'};
   if(pg==='dashboard'){const h=new Date().getHours();const greeting=h<12?'Good morning':h<17?'Good afternoon':'Good evening';document.getElementById('pg-title').textContent=`${greeting}, ${S.doc.fn}`;}
   else document.getElementById('pg-title').textContent=titles[pg]||pg;
   if(pg==='dashboard')renderDash();
+  if(pg==='calendar')loadCalendar();
   if(pg==='patients')renderPats();
   if(pg==='sicknotes'){popSelects();renderSNs();}
   if(pg==='scripts'){popSelects();renderRXs();}
@@ -1679,6 +1774,227 @@ function printEl(containerId){
   const w=window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><title>MedConsult — Document</title><link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Sora',sans-serif;background:#fff;padding:20px;color:#111}${document.querySelector('style').innerText}@media print{body{padding:0}}</style></head><body>${el.innerHTML}</body></html>`);
   w.document.close();w.focus();setTimeout(()=>{w.print();},700);
+}
+
+// ══════════════════════════════════════════════════
+//  CALENDAR
+// ══════════════════════════════════════════════════
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let calAppts = {};
+let calSelectedDate = null;
+let calDoctorId = null;
+
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+async function getCalDoctorId() {
+  if (calDoctorId) return calDoctorId;
+  const { data: { user } } = await sbClient.auth.getUser();
+  if (!user) return null;
+  const { data } = await sbClient.from('doctors').select('id').eq('auth_id', user.id).single();
+  if (data) calDoctorId = data.id;
+  return calDoctorId;
+}
+
+async function loadCalendar() {
+  const did = await getCalDoctorId();
+  const first = `${calYear}-${String(calMonth+1).padStart(2,'0')}-01`;
+  const last  = new Date(calYear, calMonth+1, 0);
+  const lastStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(last.getDate()).padStart(2,'0')}`;
+
+  calAppts = {};
+
+  if (did) {
+    const { data } = await sbClient
+      .from('appointments')
+      .select('id, appt_date, appt_time, type, status, reason, patient_id')
+      .eq('doctor_id', did)
+      .gte('appt_date', first)
+      .lte('appt_date', lastStr)
+      .order('appt_time');
+    (data || []).forEach(a => {
+      if (!calAppts[a.appt_date]) calAppts[a.appt_date] = [];
+      calAppts[a.appt_date].push(a);
+    });
+  }
+  renderCalGrid();
+}
+
+function renderCalGrid() {
+  document.getElementById('cal-month-label').textContent = `${MONTHS[calMonth]} ${calYear}`;
+  const today = new Date();
+  const firstDow = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const daysInPrev  = new Date(calYear, calMonth, 0).getDate();
+
+  let html = DAYS.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  // Leading cells from previous month
+  for (let i = firstDow - 1; i >= 0; i--) {
+    html += `<div class="cal-day other-month"><div class="cal-day-num">${daysInPrev - i}</div></div>`;
+  }
+
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = d === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear();
+    const isSel   = ds === calSelectedDate;
+    const appts   = calAppts[ds] || [];
+
+    const pills = appts.slice(0,3).map(a => {
+      const cls = a.type === 'Video Call' ? 'video' : a.type === 'Phone Call' ? 'phone' : '';
+      const pt  = S.patients.find(p => p.id === a.patient_id);
+      const lbl = pt ? `${pt.fn} ${pt.ln}` : (a.reason || a.type);
+      return `<div class="cal-pill ${cls}">${a.appt_time.slice(0,5)} ${lbl}</div>`;
+    }).join('');
+    const more = appts.length > 3 ? `<div style="font-size:9px;color:var(--ink2);margin-top:1px">+${appts.length-3} more</div>` : '';
+
+    html += `<div class="cal-day${isToday?' today':''}${isSel?' selected':''}" onclick="calSelectDay('${ds}')">
+      <div class="cal-day-num">${isToday ? `<span style="background:var(--azure);color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center">${d}</span>` : d}</div>
+      ${pills}${more}
+    </div>`;
+  }
+
+  // Trailing cells
+  const total = firstDow + daysInMonth;
+  const trail = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let i = 1; i <= trail; i++) {
+    html += `<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
+  }
+
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function calSelectDay(ds) {
+  calSelectedDate = ds;
+  renderCalGrid();
+
+  const [y, m, d] = ds.split('-');
+  document.getElementById('cal-panel-title').textContent = `${parseInt(d)} ${MONTHS_SHORT[parseInt(m)-1]} ${y}`;
+
+  const appts = calAppts[ds] || [];
+  document.getElementById('cal-panel-sub').textContent = `${appts.length} appointment${appts.length !== 1 ? 's' : ''}`;
+
+  if (!appts.length) {
+    document.getElementById('cal-panel-body').innerHTML = `<div class="appt-empty">No appointments on this day</div>`;
+    return;
+  }
+
+  document.getElementById('cal-panel-body').innerHTML = appts.map(a => {
+    const cls = a.type === 'Video Call' ? 'video' : a.type === 'Phone Call' ? 'phone' : '';
+    const pt  = S.patients.find(p => p.id === a.patient_id);
+    const ptName = pt ? `${pt.fn} ${pt.ln}` : 'Patient';
+    return `<div class="appt-item ${cls}">
+      <div class="appt-time">${a.appt_time.slice(0,5)}</div>
+      <div class="appt-patient">${ptName}</div>
+      <div class="appt-meta">
+        <span>${a.type}</span>
+        <span class="appt-badge">${a.status}</span>
+      </div>
+      ${a.reason ? `<div style="font-size:11px;color:var(--ink2);margin-top:4px">${a.reason}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function calMove(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  calSelectedDate = null;
+  document.getElementById('cal-panel-title').textContent = 'Select a day';
+  document.getElementById('cal-panel-sub').textContent = '';
+  document.getElementById('cal-panel-body').innerHTML = `<div class="appt-empty">← Click a day to view appointments</div>`;
+  loadCalendar();
+}
+
+function calToday() {
+  calYear  = new Date().getFullYear();
+  calMonth = new Date().getMonth();
+  calSelectedDate = null;
+  loadCalendar();
+}
+
+// ══════════════════════════════════════════════════
+//  AVAILABILITY
+// ══════════════════════════════════════════════════
+const AVAIL_DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const AVAIL_DOW  = [1,2,3,4,5,6,0];
+let availState = AVAIL_DAYS.map((_, i) => ({
+  active: i < 5, start: '08:00', end: '17:00', slot: 20
+}));
+
+async function openAvailability() {
+  const did = await getCalDoctorId();
+  if (did) {
+    const { data } = await sbClient.from('availability').select('*').eq('doctor_id', did);
+    if (data && data.length) {
+      availState = AVAIL_DAYS.map((_, i) => {
+        const row = data.find(r => r.day_of_week === AVAIL_DOW[i]);
+        return row
+          ? { active: row.is_active, start: row.start_time.slice(0,5), end: row.end_time.slice(0,5), slot: row.slot_minutes }
+          : { active: i < 5, start: '08:00', end: '17:00', slot: 20 };
+      });
+    }
+  }
+  renderAvailRows();
+  openM('m-availability');
+}
+
+function renderAvailRows() {
+  const times = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      times.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`);
+    }
+  }
+  const opts = times.map(t => `<option value="${t}">${t}</option>`).join('');
+  const slots = [10,15,20,30,45,60].map(s => `<option value="${s}">${s} min</option>`).join('');
+
+  document.getElementById('avail-rows').innerHTML = AVAIL_DAYS.map((day, i) => {
+    const s = availState[i];
+    return `<div class="avail-row">
+      <div class="avail-label">${day.slice(0,3)}</div>
+      <button class="avail-toggle ${s.active?'on':'off'}" onclick="toggleAvailDay(${i})" title="${s.active?'Active':'Off'}"></button>
+      <select class="avail-inputs" onchange="availState[${i}].start=this.value" ${s.active?'':'disabled'}>
+        ${times.map(t=>`<option value="${t}"${t===s.start?' selected':''}>${t}</option>`).join('')}
+      </select>
+      <select class="avail-inputs" onchange="availState[${i}].end=this.value" ${s.active?'':'disabled'}>
+        ${times.map(t=>`<option value="${t}"${t===s.end?' selected':''}>${t}</option>`).join('')}
+      </select>
+      <select class="avail-inputs" onchange="availState[${i}].slot=+this.value" ${s.active?'':'disabled'}>
+        ${[10,15,20,30,45,60].map(s2=>`<option value="${s2}"${s2===s.slot?' selected':''}>${s2} min</option>`).join('')}
+      </select>
+    </div>`;
+  }).join('');
+}
+
+function toggleAvailDay(i) {
+  availState[i].active = !availState[i].active;
+  renderAvailRows();
+}
+
+async function saveAvailability() {
+  const did = await getCalDoctorId();
+  if (!did) { toast('Doctor profile not found in database', 'error'); return; }
+
+  const rows = AVAIL_DAYS.map((_, i) => ({
+    doctor_id:    did,
+    day_of_week:  AVAIL_DOW[i],
+    start_time:   availState[i].start,
+    end_time:     availState[i].end,
+    slot_minutes: availState[i].slot,
+    is_active:    availState[i].active
+  }));
+
+  const { error } = await sbClient
+    .from('availability')
+    .upsert(rows, { onConflict: 'doctor_id,day_of_week' });
+
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Availability saved', 'success');
+  closeM('m-availability');
 }
 
 // ══════════════════════════════════════════════════
