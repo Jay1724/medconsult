@@ -749,12 +749,12 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
           </div>
           <div class="pay-section">
             <div class="pay-section-title">💳 Payment Details</div>
-            <div class="auth-field"><label>Card Number</label><input type="text" id="su-card" placeholder="4242 4242 4242 4242" maxlength="19" oninput="fmtCard(this)"></div>
+            <div class="auth-field"><label>Card Number</label><input type="text" id="su-card" placeholder="4242 4242 4242 4242" maxlength="19" oninput="fmtCard(this)"><span class="field-error" id="err-su-card"></span></div>
             <div class="auth-2col">
-              <div class="auth-field"><label>Expiry</label><input type="text" id="su-exp" placeholder="MM / YY" maxlength="7" oninput="fmtExp(this)"></div>
-              <div class="auth-field"><label>CVV</label><input type="text" id="su-cvv" placeholder="123" maxlength="4"></div>
+              <div class="auth-field"><label>Expiry</label><input type="text" id="su-exp" placeholder="MM / YY" maxlength="7" oninput="fmtExp(this)"><span class="field-error" id="err-su-exp"></span></div>
+              <div class="auth-field"><label>CVV</label><input type="text" id="su-cvv" placeholder="123" maxlength="4"><span class="field-error" id="err-su-cvv"></span></div>
             </div>
-            <div class="auth-field"><label>Name on Card</label><input type="text" id="su-cname" placeholder="DR JANE ROBERTS"></div>
+            <div class="auth-field"><label>Name on Card</label><input type="text" id="su-cname" placeholder="DR JANE ROBERTS"><span class="field-error" id="err-su-cname"></span></div>
           </div>
           <div class="auth-secure">🔒 Payments processed securely · 7 days free · Cancel anytime</div>
           <div style="display:flex;gap:10px">
@@ -1284,6 +1284,19 @@ function seed() {
 function switchAuth(m) {
   ['login','signup'].forEach((v,i) => { document.getElementById('auth-'+v).style.display = v===m?'block':'none'; document.querySelectorAll('.auth-tab')[i].classList.toggle('active',v===m); });
 }
+function fieldErr(id, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+}
+function fieldOk(id) { fieldErr(id, ''); }
+function markInput(id, invalid) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('invalid', invalid);
+}
+function clearSsErrors(...ids) { ids.forEach(id => { fieldOk('err-su-'+id); markInput('su-'+id, false); }); }
+
 function ssGo(n) {
   if (n === 2) {
     const fn = document.getElementById('su-fn').value.trim();
@@ -1292,22 +1305,28 @@ function ssGo(n) {
     const pw = document.getElementById('su-pw').value;
     const hpcsa = document.getElementById('su-hpcsa').value.trim();
     const pracnum = document.getElementById('su-pracnum').value.trim();
-    if (!fn) { toast('Please enter your first name', 'error'); return; }
-    if (!ln) { toast('Please enter your last name', 'error'); return; }
-    if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { toast('Please enter a valid email address', 'error'); return; }
-    if (!pw || pw.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
-    if (!hpcsa) { toast('Please enter your HPCSA number', 'error'); return; }
-    if (!pracnum) { toast('Please enter your practice number', 'error'); return; }
+    clearSsErrors('fn','ln','email','pw','hpcsa','pracnum');
+    let ok = true;
+    if (!fn)  { fieldErr('err-su-fn','First name is required'); markInput('su-fn',true); ok=false; }
+    if (!ln)  { fieldErr('err-su-ln','Last name is required'); markInput('su-ln',true); ok=false; }
+    if (!em || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { fieldErr('err-su-email','Please enter a valid email address'); markInput('su-email',true); ok=false; }
+    if (!pw || pw.length < 8) { fieldErr('err-su-pw','Password must be at least 8 characters'); markInput('su-pw',true); ok=false; }
+    if (!hpcsa)  { fieldErr('err-su-hpcsa','HPCSA number is required'); markInput('su-hpcsa',true); ok=false; }
+    if (!pracnum){ fieldErr('err-su-pracnum','Practice number is required'); markInput('su-pracnum',true); ok=false; }
+    if (!ok) return;
   }
   if (n === 3) {
-    const pname = document.getElementById('su-pname').value.trim();
-    const paddr = document.getElementById('su-paddr').value.trim();
+    const pname  = document.getElementById('su-pname').value.trim();
+    const paddr  = document.getElementById('su-paddr').value.trim();
     const pphone = document.getElementById('su-pphone').value.trim();
-    const bank = document.getElementById('su-bank').value.trim();
-    if (!pname) { toast('Please enter your practice name', 'error'); return; }
-    if (!paddr) { toast('Please enter your practice address', 'error'); return; }
-    if (!pphone) { toast('Please enter your practice phone number', 'error'); return; }
-    if (!bank) { toast('Please enter your bank account details', 'error'); return; }
+    const bank   = document.getElementById('su-bank').value.trim();
+    clearSsErrors('pname','paddr','pphone','bank');
+    let ok = true;
+    if (!pname)  { fieldErr('err-su-pname','Practice name is required'); markInput('su-pname',true); ok=false; }
+    if (!paddr)  { fieldErr('err-su-paddr','Practice address is required'); markInput('su-paddr',true); ok=false; }
+    if (!pphone) { fieldErr('err-su-pphone','Phone number is required'); markInput('su-pphone',true); ok=false; }
+    if (!bank)   { fieldErr('err-su-bank','Bank account details are required'); markInput('su-bank',true); ok=false; }
+    if (!ok) return;
   }
   [1,2,3].forEach(i => document.getElementById('ss'+i).style.display = i===n?'block':'none');
 }
@@ -1352,10 +1371,13 @@ async function doSignup() {
   const exp = document.getElementById('su-exp').value.trim();
   const cvv = document.getElementById('su-cvv').value.trim();
   const cname = document.getElementById('su-cname').value.trim();
-  if (!card || card.length < 16) { toast('Please enter a valid card number', 'error'); return; }
-  if (!exp || exp.length < 7) { toast('Please enter the card expiry date', 'error'); return; }
-  if (!cvv || cvv.length < 3) { toast('Please enter the CVV', 'error'); return; }
-  if (!cname) { toast('Please enter the name on your card', 'error'); return; }
+  clearSsErrors('card','exp','cvv','cname');
+  let cardOk = true;
+  if (!card || card.length < 16) { fieldErr('err-su-card','Please enter a valid 16-digit card number'); markInput('su-card',true); cardOk=false; }
+  if (!exp || exp.length < 7)    { fieldErr('err-su-exp','Please enter a valid expiry date (MM / YY)'); markInput('su-exp',true); cardOk=false; }
+  if (!cvv || cvv.length < 3)   { fieldErr('err-su-cvv','CVV must be 3–4 digits'); markInput('su-cvv',true); cardOk=false; }
+  if (!cname)                    { fieldErr('err-su-cname','Name on card is required'); markInput('su-cname',true); cardOk=false; }
+  if (!cardOk) return;
   const meta = {
     name: `Dr. ${fn} ${ln}`, fn, ln,
     spec: document.getElementById('su-spec').value,
