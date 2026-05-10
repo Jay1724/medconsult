@@ -150,6 +150,8 @@ a { text-decoration: none; color: inherit; }
 .auth-field input::placeholder { color: var(--grey-500); }
 .auth-field input:focus, .auth-field select:focus { border-color: var(--azure); background: var(--grey-600); box-shadow: 0 0 0 3px var(--azure-dim); }
 .auth-field select option { background: var(--grey-800); color: var(--white); }
+.auth-field input.invalid { border-color: var(--danger) !important; box-shadow: 0 0 0 3px rgba(220,38,38,0.15) !important; }
+.field-error { display: block; font-size: 11px; color: var(--danger); margin-top: 5px; min-height: 0; }
 .auth-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 .plan-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
@@ -650,11 +652,11 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
           <div class="auth-subtitle">Step 1 of 3 — Your details</div>
           <div class="auth-step-indicator"><div class="auth-step-dot done"></div><div class="auth-step-dot"></div><div class="auth-step-dot"></div></div>
           <div class="auth-2col">
-            <div class="auth-field"><label>First Name</label><input type="text" id="su-fn" placeholder="Jane"></div>
-            <div class="auth-field"><label>Last Name</label><input type="text" id="su-ln" placeholder="Roberts"></div>
+            <div class="auth-field"><label>First Name</label><input type="text" id="su-fn" placeholder="Jane"><span class="field-error" id="err-su-fn"></span></div>
+            <div class="auth-field"><label>Last Name</label><input type="text" id="su-ln" placeholder="Roberts"><span class="field-error" id="err-su-ln"></span></div>
           </div>
-          <div class="auth-field"><label>Email Address</label><input type="email" id="su-email" placeholder="dr@practice.co.za"></div>
-          <div class="auth-field"><label>Password</label><input type="password" id="su-pw" placeholder="Min 8 characters"></div>
+          <div class="auth-field"><label>Email Address</label><input type="email" id="su-email" placeholder="dr@practice.co.za"><span class="field-error" id="err-su-email"></span></div>
+          <div class="auth-field"><label>Password</label><input type="password" id="su-pw" placeholder="Min 8 characters"><span class="field-error" id="err-su-pw"></span></div>
           <div class="auth-field"><label>Specialisation</label>
             <select id="su-spec">
               <option>General Practitioner</option><option>Internal Medicine</option><option>Paediatrician</option>
@@ -663,8 +665,8 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
             </select>
           </div>
           <div class="auth-2col">
-            <div class="auth-field"><label>HPCSA Number</label><input type="text" id="su-hpcsa" placeholder="MP0123456"></div>
-            <div class="auth-field"><label>Practice Number</label><input type="text" id="su-pracnum" placeholder="0123456"></div>
+            <div class="auth-field"><label>HPCSA Number</label><input type="text" id="su-hpcsa" placeholder="MP0123456"><span class="field-error" id="err-su-hpcsa"></span></div>
+            <div class="auth-field"><label>Practice Number</label><input type="text" id="su-pracnum" placeholder="0123456"><span class="field-error" id="err-su-pracnum"></span></div>
           </div>
           <button class="auth-btn" onclick="ssGo(2)">Continue →</button>
           <div class="auth-note" onclick="switchAuth('login')">Already have an account? <span>Sign in</span></div>
@@ -674,13 +676,13 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
           <div class="auth-title">Practice details</div>
           <div class="auth-subtitle">Step 2 of 3 — Your practice info</div>
           <div class="auth-step-indicator"><div class="auth-step-dot done"></div><div class="auth-step-dot done"></div><div class="auth-step-dot"></div></div>
-          <div class="auth-field"><label>Practice Name</label><input type="text" id="su-pname" placeholder="Roberts Family Practice"></div>
-          <div class="auth-field"><label>Practice Address</label><input type="text" id="su-paddr" placeholder="123 Medical Centre, Sandton, 2196"></div>
+          <div class="auth-field"><label>Practice Name</label><input type="text" id="su-pname" placeholder="Roberts Family Practice"><span class="field-error" id="err-su-pname"></span></div>
+          <div class="auth-field"><label>Practice Address</label><input type="text" id="su-paddr" placeholder="123 Medical Centre, Sandton, 2196"><span class="field-error" id="err-su-paddr"></span></div>
           <div class="auth-2col">
-            <div class="auth-field"><label>Phone Number</label><input type="tel" id="su-pphone" placeholder="+27 11 123 4567"></div>
+            <div class="auth-field"><label>Phone Number</label><input type="tel" id="su-pphone" placeholder="+27 11 123 4567"><span class="field-error" id="err-su-pphone"></span></div>
             <div class="auth-field"><label>VAT Number</label><input type="text" id="su-vat" placeholder="4123456789 (optional)"></div>
           </div>
-          <div class="auth-field"><label>Bank Account (for patient EFT payments)</label><input type="text" id="su-bank" placeholder="e.g. FNB, Acc: 62123456, Branch: 250655"></div>
+          <div class="auth-field"><label>Bank Account (for patient EFT payments)</label><input type="text" id="su-bank" placeholder="e.g. FNB, Acc: 62123456, Branch: 250655"><span class="field-error" id="err-su-bank"></span></div>
           <div class="auth-field"><label>Digital Signature Name (appears on documents)</label><input type="text" id="su-sig" placeholder="Dr. Jane Roberts" style="font-family:'Playfair Display',serif;font-style:italic;font-size:18px;color:var(--azure)"></div>
           <div style="display:flex;gap:10px;margin-top:4px">
             <button class="auth-btn auth-btn-ghost" style="flex:0 0 auto;width:auto;padding:11px 18px" onclick="ssGo(1)">← Back</button>
@@ -767,7 +769,7 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
     <div class="topbar-right">
       <div class="searchbar"><span style="color:var(--grey-300)">⌕</span><input placeholder="Search patients…" oninput="globalSearch(this.value)"></div>
       <button class="btn btn-primary" onclick="showAddPatient()">+ New Patient</button>
-      <button class="btn btn-ghost btn-sm" onclick="doLogout()" title="Sign out" style="font-size:16px;padding:6px 10px">↩</button>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">Log out</button>
     </div>
   </div>
   <div class="content">
@@ -1291,6 +1293,8 @@ function launchApp() {
   document.getElementById('sb-name').textContent=d.name;
   document.getElementById('sb-role').textContent=d.spec;
   document.getElementById('sb-plan').textContent=S.plan==='pro'?'PRO':'STARTER';
+  const h=new Date().getHours();const greeting=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
+  document.getElementById('pg-title').textContent=`${greeting}, ${d.fn}`;
   popSelects(); renderDash(); initSigs(); renderSub();
 }
 
@@ -1322,7 +1326,8 @@ function nav(pg, el) {
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   if(el)el.classList.add('active');
   const titles={dashboard:'Dashboard',consultations:'Consultations',patients:'All Patients',records:'Medical Records',sicknotes:'Sick Notes',scripts:'Prescriptions',invoices:'Invoices',claims:'Medical Aid Claims',subscription:'Subscription'};
-  document.getElementById('pg-title').textContent=titles[pg]||pg;
+  if(pg==='dashboard'){const h=new Date().getHours();const greeting=h<12?'Good morning':h<17?'Good afternoon':'Good evening';document.getElementById('pg-title').textContent=`${greeting}, ${S.doc.fn}`;}
+  else document.getElementById('pg-title').textContent=titles[pg]||pg;
   if(pg==='dashboard')renderDash();
   if(pg==='patients')renderPats();
   if(pg==='sicknotes'){popSelects();renderSNs();}
