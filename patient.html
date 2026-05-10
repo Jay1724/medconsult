@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2b7fff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="MedConsult">
+<title>MedConsult — Patient Portal</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --azure:       #2b7fff;
+  --azure-light: #5b9fff;
+  --azure-dim:   rgba(43,127,255,0.10);
+  --bg:          #f4f4f7;
+  --surface:     #ffffff;
+  --surface2:    #f0f0f5;
+  --ink:         #111113;
+  --ink2:        #5a5a65;
+  --ink3:        #a8a8b8;
+  --border:      #e2e2ea;
+  --danger:      #dc2626;
+  --danger-dim:  rgba(220,38,38,0.10);
+  --success:     #16a34a;
+  --success-dim: rgba(22,163,74,0.10);
+  --warning:     #d97706;
+  --warning-dim: rgba(217,119,6,0.10);
+  --radius:      16px;
+  --radius-sm:   11px;
+  --shadow:      0 2px 12px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  --shadow-md:   0 6px 24px rgba(0,0,0,0.09), 0 2px 6px rgba(0,0,0,0.05);
+  --shadow-az:   0 4px 18px rgba(43,127,255,0.28);
+  --nav-h:       62px;
+  --sab:         env(safe-area-inset-bottom, 0px);
+  --sat:         env(safe-area-inset-top, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: 'Sora', sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+
+#root {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100%;
+  background: var(--bg);
+  position: relative;
+}
+
+/* ── LOADING ── */
+#loading-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--azure);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  transition: opacity 0.3s ease;
+}
+.loading-logo { font-size: 30px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+.loading-sub  { font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 4px; }
+.loading-spinner {
+  width: 30px; height: 30px; margin-top: 36px;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── AUTH ── */
+#auth-screen {
+  display: none; flex-direction: column;
+  min-height: 100vh;
+  padding: calc(var(--sat) + 48px) 24px calc(var(--sab) + 32px);
+}
+.auth-brand  { margin-bottom: 36px; }
+.auth-logo   { font-size: 24px; font-weight: 700; color: var(--azure); }
+.auth-tagline{ font-size: 13px; color: var(--ink2); margin-top: 4px; line-height: 1.5; }
+.invite-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--success-dim); color: var(--success);
+  border-radius: 20px; padding: 5px 13px;
+  font-size: 12px; font-weight: 600; margin-bottom: 20px;
+}
+.auth-tabs   { display: flex; border-bottom: 2px solid var(--border); margin-bottom: 24px; }
+.auth-tab    {
+  flex: 1; text-align: center; padding: 10px 4px;
+  font-size: 14px; font-weight: 600; color: var(--ink2);
+  cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+  transition: color 0.15s;
+}
+.auth-tab.active { color: var(--azure); border-bottom-color: var(--azure); }
+.auth-panel  { display: none; }
+.auth-panel.active { display: block; }
+
+.field { margin-bottom: 16px; }
+.field label {
+  display: block; font-size: 10px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--ink2); margin-bottom: 7px;
+}
+.field input {
+  width: 100%; padding: 13px 15px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: 'Sora', sans-serif; font-size: 15px; color: var(--ink);
+  outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+  -webkit-appearance: none;
+}
+.field input:focus { border-color: var(--azure); box-shadow: 0 0 0 3px var(--azure-dim); }
+.field input::placeholder { color: var(--ink3); }
+
+.btn-primary {
+  display: block; width: 100%; padding: 15px;
+  background: var(--azure); color: #fff; border: none;
+  border-radius: var(--radius-sm);
+  font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 600;
+  cursor: pointer; box-shadow: var(--shadow-az);
+  transition: background 0.15s, transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-primary:active { transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.6; pointer-events: none; }
+
+.btn-ghost {
+  display: block; width: 100%; padding: 13px;
+  background: transparent; color: var(--ink2);
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-ghost:active { background: var(--surface2); }
+
+.auth-note { font-size: 12px; color: var(--ink2); text-align: center; margin-top: 14px; line-height: 1.6; }
+
+/* ── APP SHELL ── */
+#app-screen { display: none; flex-direction: column; min-height: 100vh; }
+
+.app-header {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  padding: calc(var(--sat) + 14px) 20px 14px;
+}
+.app-header-title { font-size: 19px; font-weight: 700; color: var(--ink); }
+.app-header-sub   { font-size: 12px; color: var(--ink2); margin-top: 2px; }
+
+.tab-content {
+  flex: 1;
+  padding: 16px 16px calc(var(--nav-h) + var(--sab) + 20px);
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px;
+  background: var(--surface); border-top: 1px solid var(--border);
+  display: flex; z-index: 200;
+  padding-bottom: var(--sab);
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; padding: 10px 2px 8px;
+  background: none; border: none;
+  color: var(--ink3); font-family: 'Sora', sans-serif;
+  cursor: pointer; transition: color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-btn.active { color: var(--azure); }
+.nav-icon  { font-size: 21px; line-height: 1; margin-bottom: 3px; }
+.nav-label { font-size: 9px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 16px; margin-bottom: 12px;
+}
+.section-hd {
+  font-size: 12px; font-weight: 700; color: var(--ink2);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin: 18px 0 10px;
+}
+.section-hd:first-child { margin-top: 0; }
+
+/* ── HOME ── */
+.greeting-hi   { font-size: 23px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+.greeting-date { font-size: 13px; color: var(--ink2); margin-top: 4px; margin-bottom: 16px; }
+
+.next-card {
+  background: linear-gradient(135deg, var(--azure) 0%, var(--azure-light) 100%);
+  border-radius: var(--radius); padding: 20px; margin-bottom: 12px; color: #fff;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.next-card-eyebrow { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; opacity: 0.8; margin-bottom: 8px; }
+.next-card-doctor  { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.next-card-time    { font-size: 14px; opacity: 0.9; margin-bottom: 12px; }
+.next-card-type    {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.2); border-radius: 20px;
+  padding: 4px 12px; font-size: 12px; font-weight: 600;
+}
+
+.qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.qa-btn {
+  background: var(--surface); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow); padding: 16px 14px; border: none;
+  font-family: 'Sora', sans-serif; cursor: pointer; text-align: left;
+  transition: transform 0.1s; -webkit-tap-highlight-color: transparent;
+}
+.qa-btn:active { transform: scale(0.97); }
+.qa-icon  { font-size: 22px; display: block; margin-bottom: 8px; }
+.qa-label { font-size: 13px; font-weight: 600; color: var(--ink); display: block; }
+.qa-sub   { font-size: 11px; color: var(--ink2); display: block; margin-top: 2px; }
+
+/* ── APPOINTMENTS ── */
+.appt-card {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 15px 16px; margin-bottom: 10px;
+  border-left: 4px solid var(--azure);
+}
+.appt-card.past      { border-left-color: var(--ink3); }
+.appt-card.cancelled { border-left-color: var(--danger); }
+.appt-card.completed { border-left-color: var(--success); }
+.appt-row  { display: flex; justify-content: space-between; align-items: flex-start; }
+.appt-dr   { font-size: 15px; font-weight: 700; color: var(--ink); }
+.appt-spec { font-size: 11px; color: var(--ink2); margin-top: 2px; }
+.appt-dt   { font-size: 13px; color: var(--ink2); margin-top: 5px; }
+.appt-meta { margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.badge {
+  font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 20px;
+}
+.badge-confirmed { background: var(--success-dim); color: var(--success); }
+.badge-pending   { background: var(--warning-dim); color: var(--warning); }
+.badge-cancelled { background: var(--danger-dim);  color: var(--danger); }
+.badge-completed { background: var(--surface2);    color: var(--ink2); }
+.badge-type      { background: var(--azure-dim);   color: var(--azure); }
+.appt-reason { font-size: 12px; color: var(--ink2); margin-top: 6px; line-height: 1.4; }
+
+/* ── BOOKING SHEET ── */
+.sheet-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(0,0,0,0.4); backdrop-filter: blur(4px);
+  display: none; align-items: flex-end; justify-content: center;
+}
+.sheet-overlay.open { display: flex; }
+.sheet {
+  background: var(--surface); border-radius: 22px 22px 0 0;
+  width: 100%; max-width: 480px;
+  max-height: 88vh; overflow-y: auto;
+  padding: 8px 20px calc(24px + var(--sab));
+  animation: slideUp 0.3s cubic-bezier(0.32,0.72,0,1);
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 20px; }
+.sheet-title  { font-size: 19px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+.sheet-sub    { font-size: 13px; color: var(--ink2); margin-bottom: 20px; }
+
+.step-dots { display: flex; gap: 6px; margin-bottom: 20px; }
+.step-dot  { width: 8px; height: 8px; border-radius: 50%; background: var(--border); transition: background 0.2s; }
+.step-dot.active { background: var(--azure); }
+.step-dot.done   { background: var(--success); }
+
+.date-input {
+  width: 100%; padding: 13px 15px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-family: 'Sora', sans-serif; font-size: 15px; color: var(--ink);
+  background: var(--surface); outline: none;
+  -webkit-appearance: none; transition: border-color 0.15s;
+}
+.date-input:focus { border-color: var(--azure); box-shadow: 0 0 0 3px var(--azure-dim); }
+
+.slots-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 14px 0; }
+.slot-chip {
+  padding: 11px 4px; text-align: center;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600; color: var(--ink);
+  cursor: pointer; background: var(--surface);
+  transition: all 0.15s; -webkit-tap-highlight-color: transparent;
+}
+.slot-chip:active, .slot-chip.selected {
+  background: var(--azure); color: #fff; border-color: var(--azure);
+}
+
+.reason-input {
+  width: 100%; padding: 12px 14px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-family: 'Sora', sans-serif; font-size: 14px; color: var(--ink);
+  outline: none; margin-bottom: 14px; background: var(--surface);
+}
+.reason-input:focus { border-color: var(--azure); box-shadow: 0 0 0 3px var(--azure-dim); }
+
+/* ── RECORDS ── */
+.record-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 10px; overflow: hidden; }
+.record-hd {
+  padding: 14px 16px; display: flex;
+  align-items: center; justify-content: space-between;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.record-date { font-size: 11px; font-weight: 600; color: var(--ink2); margin-bottom: 3px; }
+.record-diag { font-size: 14px; font-weight: 700; color: var(--ink); }
+.record-icd  { font-size: 11px; color: var(--ink3); margin-top: 2px; }
+.record-chevron { color: var(--ink3); font-size: 18px; transition: transform 0.2s; flex-shrink: 0; margin-left: 10px; }
+.record-card.open .record-chevron { transform: rotate(90deg); }
+.record-body { display: none; padding: 0 16px 16px; border-top: 1px solid var(--border); }
+.record-card.open .record-body { display: block; }
+.rec-field { margin-top: 12px; }
+.rec-field-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--ink2); margin-bottom: 4px; }
+.rec-field-val { font-size: 13px; color: var(--ink); line-height: 1.6; }
+
+/* ── DOCUMENTS ── */
+.doc-card {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px 16px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 12px;
+}
+.doc-type-tag { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--azure); margin-bottom: 3px; }
+.doc-date     { font-size: 14px; font-weight: 600; color: var(--ink); }
+.doc-diag     { font-size: 12px; color: var(--ink2); margin-top: 2px; }
+.doc-view-btn {
+  flex-shrink: 0; background: var(--azure-dim); color: var(--azure);
+  border: none; border-radius: 9px; padding: 8px 14px;
+  font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+
+/* ── PROFILE ── */
+.profile-hero {
+  background: var(--surface); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 20px; margin-bottom: 12px;
+  display: flex; align-items: center; gap: 14px;
+}
+.profile-avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--azure); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 700; flex-shrink: 0;
+}
+.profile-name { font-size: 18px; font-weight: 700; color: var(--ink); }
+.profile-em   { font-size: 12px; color: var(--ink2); margin-top: 3px; }
+.info-block   { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 12px; }
+.info-title   { padding: 11px 16px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--ink2); background: var(--surface2); border-bottom: 1px solid var(--border); }
+.info-row     { display: flex; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 12px; }
+.info-row:last-child { border-bottom: none; }
+.info-key     { font-size: 12px; color: var(--ink2); min-width: 130px; flex-shrink: 0; }
+.info-val     { font-size: 13px; font-weight: 500; color: var(--ink); flex: 1; word-break: break-word; }
+
+/* ── EMPTY STATE ── */
+.empty { text-align: center; padding: 52px 20px; }
+.empty-icon  { font-size: 38px; margin-bottom: 12px; }
+.empty-title { font-size: 15px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+.empty-sub   { font-size: 13px; color: var(--ink2); line-height: 1.6; }
+
+/* ── SPINNER INLINE ── */
+.spinner {
+  width: 26px; height: 26px; margin: 40px auto;
+  border: 3px solid var(--border); border-top-color: var(--azure);
+  border-radius: 50%; animation: spin 0.75s linear infinite;
+}
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; left: 50%; bottom: calc(var(--nav-h) + var(--sab) + 14px);
+  transform: translateX(-50%) translateY(8px);
+  background: var(--ink); color: #fff;
+  padding: 11px 20px; border-radius: 22px;
+  font-size: 13px; font-weight: 500; white-space: nowrap;
+  max-width: calc(100vw - 32px); text-align: center;
+  opacity: 0; pointer-events: none; z-index: 9000;
+  transition: opacity 0.25s, transform 0.25s;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.success { background: var(--success); }
+.toast.error   { background: var(--danger); }
+</style>
+</head>
+<body>
+<div id="root">
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="loading-logo">MedConsult</div>
+  <div class="loading-sub">Patient Portal</div>
+  <div class="loading-spinner"></div>
+</div>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-brand">
+    <div class="auth-logo">MedConsult</div>
+    <div class="auth-tagline">Your health, at your fingertips</div>
+  </div>
+  <div id="invite-pill-wrap" style="display:none">
+    <div class="invite-pill">✓ Invite link detected — register below</div>
+  </div>
+  <div class="auth-tabs">
+    <div class="auth-tab active" onclick="authTab('login')">Sign In</div>
+    <div class="auth-tab" onclick="authTab('register')">Register</div>
+  </div>
+  <!-- LOGIN -->
+  <div class="auth-panel active" id="panel-login">
+    <div class="field"><label>Email</label><input type="email" id="l-email" placeholder="your@email.com" autocomplete="email"></div>
+    <div class="field"><label>Password</label><input type="password" id="l-pw" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn-primary" id="login-btn" onclick="doLogin()">Sign In</button>
+  </div>
+  <!-- REGISTER -->
+  <div class="auth-panel" id="panel-register">
+    <div class="field"><label>Email</label><input type="email" id="r-email" placeholder="your@email.com" autocomplete="email"></div>
+    <div class="field"><label>Password</label><input type="password" id="r-pw" placeholder="Min 8 characters" autocomplete="new-password"></div>
+    <div class="field"><label>Confirm Password</label><input type="password" id="r-pw2" placeholder="Repeat password" autocomplete="new-password"></div>
+    <button class="btn-primary" id="reg-btn" onclick="doRegister()">Create Account</button>
+    <p class="auth-note">You need an invite link from your doctor to register.</p>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app-screen">
+  <div class="app-header">
+    <div class="app-header-title" id="hdr-title">Home</div>
+    <div class="app-header-sub" id="hdr-sub"></div>
+  </div>
+  <div class="tab-content">
+    <!-- HOME -->
+    <div class="tab-panel active" id="tab-home">
+      <div class="greeting-hi" id="home-greeting">Hello</div>
+      <div class="greeting-date" id="home-date"></div>
+      <div id="next-appt-wrap"></div>
+      <div class="qa-grid">
+        <button class="qa-btn" onclick="switchTab('appointments');setTimeout(openBooking,120)">
+          <span class="qa-icon">📅</span>
+          <span class="qa-label">Book</span>
+          <span class="qa-sub">New appointment</span>
+        </button>
+        <button class="qa-btn" onclick="switchTab('records')">
+          <span class="qa-icon">📋</span>
+          <span class="qa-label">Records</span>
+          <span class="qa-sub">Medical history</span>
+        </button>
+        <button class="qa-btn" onclick="switchTab('documents')">
+          <span class="qa-icon">📄</span>
+          <span class="qa-label">Documents</span>
+          <span class="qa-sub">Sick notes & scripts</span>
+        </button>
+        <button class="qa-btn" onclick="switchTab('profile')">
+          <span class="qa-icon">👤</span>
+          <span class="qa-label">Profile</span>
+          <span class="qa-sub">Your details</span>
+        </button>
+      </div>
+    </div>
+    <!-- APPOINTMENTS -->
+    <div class="tab-panel" id="tab-appointments">
+      <button class="btn-primary" style="margin-bottom:16px" onclick="openBooking()">+ Book New Appointment</button>
+      <div id="appts-body"></div>
+    </div>
+    <!-- RECORDS -->
+    <div class="tab-panel" id="tab-records">
+      <div id="records-body"></div>
+    </div>
+    <!-- DOCUMENTS -->
+    <div class="tab-panel" id="tab-documents">
+      <div class="section-hd">Sick Notes</div>
+      <div id="docs-sn"></div>
+      <div class="section-hd">Prescriptions</div>
+      <div id="docs-rx"></div>
+    </div>
+    <!-- PROFILE -->
+    <div class="tab-panel" id="tab-profile">
+      <div id="profile-body"></div>
+      <button class="btn-ghost" style="margin-top:8px" onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-tab="home" onclick="switchTab('home')"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></button>
+    <button class="nav-btn" data-tab="appointments" onclick="switchTab('appointments')"><span class="nav-icon">📅</span><span class="nav-label">Appts</span></button>
+    <button class="nav-btn" data-tab="records" onclick="switchTab('records')"><span class="nav-icon">📋</span><span class="nav-label">Records</span></button>
+    <button class="nav-btn" data-tab="documents" onclick="switchTab('documents')"><span class="nav-icon">📄</span><span class="nav-label">Docs</span></button>
+    <button class="nav-btn" data-tab="profile" onclick="switchTab('profile')"><span class="nav-icon">👤</span><span class="nav-label">Profile</span></button>
+  </nav>
+</div>
+
+<!-- BOOKING SHEET -->
+<div class="sheet-overlay" id="booking-overlay" onclick="overlayTap(event)">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div id="booking-body"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+</div><!-- #root -->
+<script>
+// ── CONFIG ──────────────────────────────────────────
+const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── STATE ────────────────────────────────────────────
+const ST = { user: null, account: null, patient: null };
+let inviteToken = null;
+let invitePatientId = null;
+let bkStep = 1, bkDate = null, bkSlot = null, bkDoctorId = null;
+
+// ── BOOT ─────────────────────────────────────────────
+(async () => {
+  const params = new URLSearchParams(location.search);
+  inviteToken = params.get('token');
+  if (inviteToken) {
+    document.getElementById('invite-pill-wrap').style.display = 'block';
+    authTab('register');
+    await validateToken(inviteToken);
+  }
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) {
+    await loadPatient(session.user);
+    bootApp();
+  } else {
+    showAuth();
+  }
+})();
+
+function hideLoader() {
+  const el = document.getElementById('loading-screen');
+  el.style.opacity = '0';
+  setTimeout(() => el.style.display = 'none', 300);
+}
+function showAuth() {
+  hideLoader();
+  document.getElementById('auth-screen').style.display = 'flex';
+}
+function bootApp() {
+  hideLoader();
+  const app = document.getElementById('app-screen');
+  app.style.display = 'flex';
+  app.style.flexDirection = 'column';
+  renderHome();
+}
+
+// ── AUTH ─────────────────────────────────────────────
+function authTab(t) {
+  ['login','register'].forEach((v,i) => {
+    document.getElementById('panel-'+v).classList.toggle('active', v===t);
+    document.querySelectorAll('.auth-tab')[i].classList.toggle('active', v===t);
+  });
+}
+
+async function validateToken(token) {
+  const { data, error } = await sb
+    .from('patient_invites')
+    .select('patient_id, status, expires_at, email')
+    .eq('token', token).single();
+  if (error || !data) { toast('Invalid invite link', 'error'); return; }
+  if (data.status !== 'pending') { toast('This invite has already been used', 'error'); return; }
+  if (new Date(data.expires_at) < new Date()) { toast('This invite link has expired', 'error'); return; }
+  invitePatientId = data.patient_id;
+  if (data.email) document.getElementById('r-email').value = data.email;
+}
+
+async function doLogin() {
+  const email = document.getElementById('l-email').value.trim();
+  const pw    = document.getElementById('l-pw').value;
+  if (!email || !pw) { toast('Please enter your email and password', 'error'); return; }
+  setBtn('login-btn', 'Signing in…', true);
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+  setBtn('login-btn', 'Sign In', false);
+  if (error) { toast(error.message, 'error'); return; }
+  await loadPatient(data.user);
+  document.getElementById('auth-screen').style.display = 'none';
+  bootApp();
+}
+
+async function doRegister() {
+  const email = document.getElementById('r-email').value.trim();
+  const pw    = document.getElementById('r-pw').value;
+  const pw2   = document.getElementById('r-pw2').value;
+  if (!email || !pw)    { toast('Please fill all fields', 'error'); return; }
+  if (pw.length < 8)    { toast('Password must be at least 8 characters', 'error'); return; }
+  if (pw !== pw2)       { toast('Passwords do not match', 'error'); return; }
+  if (!invitePatientId) { toast('A valid doctor invite link is required to register', 'error'); return; }
+  setBtn('reg-btn', 'Creating account…', true);
+  const { data, error } = await sb.auth.signUp({ email, password: pw });
+  setBtn('reg-btn', 'Create Account', false);
+  if (error) { toast(error.message, 'error'); return; }
+  await sb.from('patient_accounts').insert({ auth_id: data.user.id, patient_id: invitePatientId });
+  await sb.from('patient_invites').update({ status: 'accepted' }).eq('token', inviteToken);
+  await loadPatient(data.user);
+  document.getElementById('auth-screen').style.display = 'none';
+  bootApp();
+  toast('Account created! Check your email to verify.', 'success');
+}
+
+async function doLogout() {
+  await sb.auth.signOut();
+  location.href = location.pathname;
+}
+
+// ── LOAD PATIENT ─────────────────────────────────────
+async function loadPatient(user) {
+  ST.user = user;
+  const { data: acct } = await sb.from('patient_accounts').select('patient_id').eq('auth_id', user.id).single();
+  if (!acct) return;
+  ST.account = acct;
+  const { data: pat } = await sb.from('patients').select('*').eq('id', acct.patient_id).single();
+  ST.patient = pat;
+  if (pat?.doctor_id) bkDoctorId = pat.doctor_id;
+}
+
+// ── TABS ─────────────────────────────────────────────
+const HDR = {
+  home:         ['Home', ''],
+  appointments: ['Appointments', 'Your schedule'],
+  records:      ['Medical Records', 'Read-only'],
+  documents:    ['Documents', 'Sick notes & prescriptions'],
+  profile:      ['Profile', 'Your details'],
+};
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  document.querySelector(`.nav-btn[data-tab="${tab}"]`).classList.add('active');
+  const [t, s] = HDR[tab] || [tab, ''];
+  document.getElementById('hdr-title').textContent = t;
+  document.getElementById('hdr-sub').textContent   = s;
+  if (tab === 'appointments') loadAppointments();
+  if (tab === 'records')      loadRecords();
+  if (tab === 'documents')    loadDocuments();
+  if (tab === 'profile')      renderProfile();
+}
+
+// ── HOME ─────────────────────────────────────────────
+function renderHome() {
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const name  = ST.patient?.fn || '';
+  document.getElementById('home-greeting').textContent = name ? `${greet}, ${name}` : greet;
+  const now = new Date();
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const mons = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('home-date').textContent = `${days[now.getDay()]}, ${now.getDate()} ${mons[now.getMonth()]} ${now.getFullYear()}`;
+  loadNextAppt();
+}
+
+async function loadNextAppt() {
+  const wrap = document.getElementById('next-appt-wrap');
+  if (!ST.account) { wrap.innerHTML = noApptCard(); return; }
+  const today = isoDate(new Date());
+  const { data } = await sb.from('appointments')
+    .select('*, doctors(fn, ln, spec)')
+    .eq('patient_id', ST.account.patient_id)
+    .gte('appt_date', today)
+    .in('status', ['Confirmed','Pending'])
+    .order('appt_date').order('appt_time').limit(1);
+  if (!data || !data.length) { wrap.innerHTML = noApptCard(); return; }
+  const a = data[0];
+  const dr = a.doctors ? `Dr. ${a.doctors.fn} ${a.doctors.ln}` : 'Your Doctor';
+  wrap.innerHTML = `<div class="next-card" onclick="switchTab('appointments')">
+    <div class="next-card-eyebrow">Next Appointment</div>
+    <div class="next-card-doctor">${esc(dr)}</div>
+    <div class="next-card-time">${fmtDate(a.appt_date)} · ${a.appt_time.slice(0,5)}</div>
+    <div class="next-card-type">${typeIcon(a.type)} ${esc(a.type)}</div>
+  </div>`;
+}
+
+function noApptCard() {
+  return `<div class="card" style="text-align:center;padding:24px 16px;margin-bottom:12px">
+    <div style="font-size:28px;margin-bottom:8px">📅</div>
+    <div style="font-size:14px;font-weight:600;color:var(--ink)">No upcoming appointments</div>
+    <div style="font-size:12px;color:var(--ink2);margin-top:4px">Tap Book below to schedule one</div>
+  </div>`;
+}
+
+// ── APPOINTMENTS ─────────────────────────────────────
+async function loadAppointments() {
+  const el = document.getElementById('appts-body');
+  if (!ST.account) { el.innerHTML = empty('📅','No appointments','Book one using the button above'); return; }
+  el.innerHTML = spinner();
+  const today = isoDate(new Date());
+  const { data } = await sb.from('appointments')
+    .select('*, doctors(fn, ln, spec)')
+    .eq('patient_id', ST.account.patient_id)
+    .order('appt_date', { ascending: false })
+    .order('appt_time', { ascending: false });
+  if (!data || !data.length) { el.innerHTML = empty('📅','No appointments yet','Use the button above to book'); return; }
+  const upcoming = data.filter(a => a.appt_date >= today && !['Cancelled','Completed','No Show'].includes(a.status));
+  const past     = data.filter(a => a.appt_date <  today || ['Cancelled','Completed','No Show'].includes(a.status));
+  let html = '';
+  if (upcoming.length) {
+    html += `<div class="section-hd">Upcoming</div>` + upcoming.map(a => apptCard(a)).join('');
+  }
+  if (past.length) {
+    html += `<div class="section-hd">Past</div>` + past.slice(0,10).map(a => apptCard(a, true)).join('');
+  }
+  el.innerHTML = html || empty('📅','No appointments yet','Use the button above to book');
+}
+
+function apptCard(a, past=false) {
+  const dr   = a.doctors ? `Dr. ${esc(a.doctors.fn)} ${esc(a.doctors.ln)}` : 'Doctor';
+  const spec = a.doctors ? esc(a.doctors.spec) : '';
+  const cls  = past ? 'past' : a.status === 'Cancelled' ? 'cancelled' : a.status === 'Completed' ? 'completed' : '';
+  const badgeCls = { Confirmed:'badge-confirmed', Pending:'badge-pending', Cancelled:'badge-cancelled', Completed:'badge-completed', 'No Show':'badge-cancelled' }[a.status] || '';
+  return `<div class="appt-card ${cls}">
+    <div class="appt-row">
+      <div>
+        <div class="appt-dr">${dr}</div>
+        ${spec ? `<div class="appt-spec">${spec}</div>` : ''}
+        <div class="appt-dt">${fmtDate(a.appt_date)} · ${a.appt_time.slice(0,5)}</div>
+      </div>
+      <span class="badge ${badgeCls}">${esc(a.status)}</span>
+    </div>
+    <div class="appt-meta">
+      <span class="badge badge-type">${typeIcon(a.type)} ${esc(a.type)}</span>
+    </div>
+    ${a.reason ? `<div class="appt-reason">${esc(a.reason)}</div>` : ''}
+  </div>`;
+}
+
+// ── BOOKING ──────────────────────────────────────────
+function openBooking() {
+  bkStep = 1; bkDate = null; bkSlot = null;
+  renderBookStep();
+  document.getElementById('booking-overlay').classList.add('open');
+}
+function closeBooking() { document.getElementById('booking-overlay').classList.remove('open'); }
+function overlayTap(e) { if (e.target === document.getElementById('booking-overlay')) closeBooking(); }
+
+function renderBookStep() {
+  const el = document.getElementById('booking-body');
+  const today = isoDate(new Date());
+  if (bkStep === 1) {
+    el.innerHTML = `
+      <div class="sheet-title">Book Appointment</div>
+      <div class="sheet-sub">Step 1 of 2 — Pick a date</div>
+      <div class="step-dots"><div class="step-dot active"></div><div class="step-dot"></div></div>
+      <div class="field"><label>Date</label>
+        <input type="date" class="date-input" id="bk-date" min="${today}" value="${bkDate || today}">
+      </div>
+      <button class="btn-primary" onclick="goStep2()">See Available Slots →</button>
+      <button class="btn-ghost" style="margin-top:10px" onclick="closeBooking()">Cancel</button>`;
+  } else {
+    el.innerHTML = `
+      <div class="sheet-title">Book Appointment</div>
+      <div class="sheet-sub">Step 2 of 2 — Pick a time on ${fmtDate(bkDate)}</div>
+      <div class="step-dots"><div class="step-dot done"></div><div class="step-dot active"></div></div>
+      <div id="slots-area">${spinner()}</div>
+      <div id="bk-confirm"></div>
+      <button class="btn-ghost" style="margin-top:10px" onclick="bkStep=1;renderBookStep()">← Back</button>`;
+    loadSlots();
+  }
+}
+
+async function goStep2() {
+  bkDate = document.getElementById('bk-date').value;
+  if (!bkDate) { toast('Please pick a date', 'error'); return; }
+  if (!bkDoctorId) { toast('No doctor linked to your account yet', 'error'); return; }
+  bkStep = 2; renderBookStep();
+}
+
+async function loadSlots() {
+  const { data, error } = await sb.rpc('get_available_slots', { p_doctor_id: bkDoctorId, p_date: bkDate });
+  const el = document.getElementById('slots-area');
+  if (error || !data || !data.length) {
+    el.innerHTML = empty('⏰','No available slots','The doctor has no openings on this day — try another date');
+    return;
+  }
+  el.innerHTML = `<div class="slots-grid">${data.map(s => {
+    const t = s.slot_time.slice(0,5);
+    return `<div class="slot-chip" onclick="pickSlot('${t}',this)">${t}</div>`;
+  }).join('')}</div>`;
+}
+
+function pickSlot(t, el) {
+  document.querySelectorAll('.slot-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  bkSlot = t;
+  document.getElementById('bk-confirm').innerHTML = `
+    <div style="margin-top:16px;padding:14px;background:var(--azure-dim);border-radius:var(--radius-sm);font-size:13px;color:var(--azure);font-weight:600;margin-bottom:14px">
+      ${fmtDate(bkDate)} at ${t}
+    </div>
+    <input type="text" class="reason-input" id="bk-reason" placeholder="Reason for visit (optional)">
+    <button class="btn-primary" onclick="confirmBooking()">Confirm Booking</button>`;
+}
+
+async function confirmBooking() {
+  if (!bkSlot) { toast('Please select a time', 'error'); return; }
+  const reason = document.getElementById('bk-reason')?.value?.trim() || '';
+  const { error } = await sb.from('appointments').insert({
+    doctor_id:   bkDoctorId,
+    patient_id:  ST.account.patient_id,
+    appt_date:   bkDate,
+    appt_time:   bkSlot,
+    type:        'In-Person',
+    status:      'Pending',
+    reason,
+    booked_by:   'patient',
+  });
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Appointment booked!', 'success');
+  closeBooking();
+  loadAppointments();
+  loadNextAppt();
+}
+
+// ── RECORDS ──────────────────────────────────────────
+async function loadRecords() {
+  const el = document.getElementById('records-body');
+  if (!ST.account) { el.innerHTML = empty('📋','No records','Your doctor will add records after consultations'); return; }
+  el.innerHTML = spinner();
+  const { data } = await sb.from('records')
+    .select('*')
+    .eq('patient_id', ST.account.patient_id)
+    .order('date', { ascending: false });
+  if (!data || !data.length) {
+    el.innerHTML = empty('📋','No medical records yet','Your doctor will add records after your consultations');
+    return;
+  }
+  el.innerHTML = data.map((r, i) => `
+    <div class="record-card" id="rc-${i}">
+      <div class="record-hd" onclick="toggleRec(${i})">
+        <div>
+          <div class="record-date">${fmtDate(r.date)}</div>
+          <div class="record-diag">${esc(r.diag || 'Consultation')}</div>
+          ${r.icd ? `<div class="record-icd">ICD-10: ${esc(r.icd)}</div>` : ''}
+        </div>
+        <div class="record-chevron">›</div>
+      </div>
+      <div class="record-body">
+        ${r.vit   ? `<div class="rec-field"><div class="rec-field-label">Vitals</div><div class="rec-field-val">${esc(r.vit)}</div></div>` : ''}
+        ${r.notes ? `<div class="rec-field"><div class="rec-field-label">Notes</div><div class="rec-field-val">${esc(r.notes)}</div></div>` : ''}
+        ${r.meds  ? `<div class="rec-field"><div class="rec-field-label">Medication</div><div class="rec-field-val">${esc(r.meds)}</div></div>` : ''}
+        ${r.fu    ? `<div class="rec-field"><div class="rec-field-label">Follow-up</div><div class="rec-field-val">${fmtDate(r.fu)}</div></div>` : ''}
+        ${r.ref   ? `<div class="rec-field"><div class="rec-field-label">Referral</div><div class="rec-field-val">${esc(r.ref)}</div></div>` : ''}
+      </div>
+    </div>`).join('');
+}
+function toggleRec(i) { document.getElementById('rc-'+i).classList.toggle('open'); }
+
+// ── DOCUMENTS ────────────────────────────────────────
+async function loadDocuments() {
+  if (!ST.account) return;
+  const pid = ST.account.patient_id;
+  document.getElementById('docs-sn').innerHTML = spinner();
+  document.getElementById('docs-rx').innerHTML = spinner();
+  const [{ data: sns }, { data: rxs }] = await Promise.all([
+    sb.from('sick_notes').select('*').eq('patient_id', pid).order('date', { ascending: false }),
+    sb.from('prescriptions').select('*').eq('patient_id', pid).order('date', { ascending: false }),
+  ]);
+  document.getElementById('docs-sn').innerHTML =
+    (sns && sns.length) ? sns.map(d => docCard(d, 'sick_note')).join('') :
+    empty('📄','No sick notes','Sick notes from your doctor will appear here');
+  document.getElementById('docs-rx').innerHTML =
+    (rxs && rxs.length) ? rxs.map(d => docCard(d, 'prescription')).join('') :
+    empty('💊','No prescriptions','Prescriptions from your doctor will appear here');
+}
+
+function docCard(d, type) {
+  const label = type === 'sick_note' ? 'Sick Note' : 'Prescription';
+  return `<div class="doc-card">
+    <div style="flex:1">
+      <div class="doc-type-tag">${label}</div>
+      <div class="doc-date">${fmtDate(d.date)}</div>
+      ${d.diag ? `<div class="doc-diag">${esc(d.diag)}</div>` : ''}
+    </div>
+    <button class="doc-view-btn" onclick="viewDoc('${type}','${d.id}')">View</button>
+  </div>`;
+}
+
+async function viewDoc(type, id) {
+  const tbl = type === 'sick_note' ? 'sick_notes' : 'prescriptions';
+  const { data } = await sb.from(tbl).select('*').eq('id', id).single();
+  if (!data) { toast('Document not found', 'error'); return; }
+  const w = window.open('', '_blank');
+  w.document.write(type === 'sick_note' ? buildSickNote(data) : buildPrescription(data));
+  w.document.close();
+}
+
+function buildSickNote(d) {
+  return `<!DOCTYPE html><html><head><title>Sick Note</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Playfair+Display:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Sora',sans-serif;padding:48px;max-width:640px;margin:0 auto;color:#111}h1{font-family:'Playfair Display',serif;font-size:28px;margin-bottom:4px}h2{font-size:13px;font-weight:400;color:#666;margin-bottom:36px}.r{display:flex;gap:8px;padding:10px 0;border-bottom:1px solid #f0f0f5}.k{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;min-width:150px;padding-top:2px}.v{font-size:14px;color:#111;flex:1}.sig{margin-top:48px;border-top:1px solid #eee;padding-top:20px;font-style:italic;color:#555;font-size:14px}@media print{body{padding:24px}}</style>
+  </head><body>
+  <h1>Medical Certificate</h1><h2>Sick Note</h2>
+  <div class="r"><div class="k">Patient</div><div class="v">${esc(d.patient_name||'')}</div></div>
+  <div class="r"><div class="k">Diagnosis</div><div class="v">${esc(d.diag||'')}</div></div>
+  ${d.icd?`<div class="r"><div class="k">ICD-10</div><div class="v">${esc(d.icd)}</div></div>`:''}
+  <div class="r"><div class="k">Date Issued</div><div class="v">${fmtDate(d.date)}</div></div>
+  <div class="r"><div class="k">Unfit From</div><div class="v">${fmtDate(d.from||d.date)}</div></div>
+  <div class="r"><div class="k">Unfit Until</div><div class="v">${fmtDate(d.to||d.date)}</div></div>
+  ${d.inst?`<div class="r"><div class="k">Instructions</div><div class="v">${esc(d.inst)}</div></div>`:''}
+  <div class="sig">${esc(d.doctor_name||'Attending Physician')}</div>
+  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
+  </body></html>`;
+}
+
+function buildPrescription(d) {
+  let medsHtml = '';
+  if (d.medications) {
+    try {
+      const meds = typeof d.medications === 'string' ? JSON.parse(d.medications) : d.medications;
+      if (Array.isArray(meds)) {
+        medsHtml = meds.filter(m=>m.name).map(m =>
+          `<div style="padding:12px;border:1px solid #eee;border-radius:8px;margin-bottom:8px">
+            <div style="font-weight:600;font-size:14px">${esc(m.name)} ${m.str?`<span style="font-weight:400;color:#888">${esc(m.str)}</span>`:''}</div>
+            ${m.dose?`<div style="font-size:13px;color:#555;margin-top:4px">${esc(m.dose)}</div>`:''}
+            ${m.qty?`<div style="font-size:12px;color:#888;margin-top:2px">Qty: ${esc(m.qty)}</div>`:''}
+          </div>`).join('');
+      }
+    } catch(e) { medsHtml = `<p style="font-size:14px">${esc(String(d.medications))}</p>`; }
+  }
+  return `<!DOCTYPE html><html><head><title>Prescription</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Playfair+Display:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Sora',sans-serif;padding:48px;max-width:640px;margin:0 auto;color:#111}h1{font-family:'Playfair Display',serif;font-size:28px;margin-bottom:4px}h2{font-size:13px;font-weight:400;color:#666;margin-bottom:36px}.rx-sym{font-family:'Playfair Display',serif;font-size:72px;color:rgba(0,0,0,0.06);float:right;margin-top:-72px;line-height:1}.r{display:flex;gap:8px;padding:10px 0;border-bottom:1px solid #f0f0f5}.k{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;min-width:150px;padding-top:2px}.v{font-size:14px;color:#111}.meds{margin-top:24px}.meds-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:12px}.sig{margin-top:48px;border-top:1px solid #eee;padding-top:20px;font-style:italic;color:#555;font-size:14px}@media print{body{padding:24px}}</style>
+  </head><body>
+  <div class="rx-sym">℞</div>
+  <h1>Prescription</h1><h2>Electronic Script</h2>
+  <div class="r"><div class="k">Patient</div><div class="v">${esc(d.patient_name||'')}</div></div>
+  <div class="r"><div class="k">Date</div><div class="v">${fmtDate(d.date)}</div></div>
+  ${d.diag?`<div class="r"><div class="k">Diagnosis</div><div class="v">${esc(d.diag)}</div></div>`:''}
+  ${medsHtml?`<div class="meds"><div class="meds-label">Medications</div>${medsHtml}</div>`:''}
+  <div class="sig">${esc(d.doctor_name||'Attending Physician')}</div>
+  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
+  </body></html>`;
+}
+
+// ── PROFILE ──────────────────────────────────────────
+function renderProfile() {
+  const el  = document.getElementById('profile-body');
+  const pat = ST.patient;
+  if (!pat) { el.innerHTML = empty('👤','Profile not found','Contact your doctor to link your account'); return; }
+  const ini = `${(pat.fn||'?')[0]}${(pat.ln||'?')[0]}`.toUpperCase();
+  el.innerHTML = `
+    <div class="profile-hero">
+      <div class="profile-avatar">${ini}</div>
+      <div>
+        <div class="profile-name">${esc(pat.fn)} ${esc(pat.ln)}</div>
+        <div class="profile-em">${esc(pat.em || ST.user?.email || '')}</div>
+      </div>
+    </div>
+    <div class="info-block">
+      <div class="info-title">Personal Details</div>
+      ${infoRow('Date of Birth', fmtDate(pat.dob) || '—')}
+      ${infoRow('SA ID Number',  pat.idnum  || '—')}
+      ${infoRow('Gender',        pat.gen    || '—')}
+      ${infoRow('Blood Type',    pat.bl     || 'Unknown')}
+    </div>
+    <div class="info-block">
+      <div class="info-title">Medical Information</div>
+      ${infoRow('Allergies',          pat.allerg  || 'None known')}
+      ${infoRow('Chronic Conditions', pat.chronic || 'None')}
+    </div>
+    <div class="info-block">
+      <div class="info-title">Medical Aid</div>
+      ${infoRow('Provider',      pat.aid     || 'None / Private')}
+      ${pat.aid ? infoRow('Member Number', pat.aidnum  || '—') : ''}
+      ${pat.aid ? infoRow('Plan / Option',  pat.aidplan || '—') : ''}
+    </div>
+    <div class="info-block">
+      <div class="info-title">Contact</div>
+      ${infoRow('Phone',    pat.ph   || '—')}
+      ${infoRow('WhatsApp', pat.wa   || '—')}
+      ${infoRow('Email',    pat.em   || '—')}
+      ${infoRow('Address',  pat.addr || '—')}
+    </div>
+    <div class="info-block">
+      <div class="info-title">Emergency Contact</div>
+      ${infoRow('Contact', pat.emer || '—')}
+    </div>`;
+}
+function infoRow(k, v) {
+  return `<div class="info-row"><div class="info-key">${k}</div><div class="info-val">${esc(String(v))}</div></div>`;
+}
+
+// ── HELPERS ──────────────────────────────────────────
+function fmtDate(ds) {
+  if (!ds) return '';
+  const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const d = new Date(ds + (ds.includes('T') ? '' : 'T00:00:00'));
+  return `${d.getDate()} ${m[d.getMonth()]} ${d.getFullYear()}`;
+}
+function isoDate(d) { return d.toISOString().split('T')[0]; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function typeIcon(t) { if (!t) return '🏥'; if (t.includes('Video')) return '📹'; if (t.includes('Phone')) return '📞'; if (t.includes('Follow')) return '🔄'; return '🏥'; }
+function empty(icon, title, sub) {
+  return `<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-title">${title}</div>${sub?`<div class="empty-sub">${sub}</div>`:''}</div>`;
+}
+function spinner() { return `<div class="spinner"></div>`; }
+function setBtn(id, label, disabled) { const b = document.getElementById(id); b.textContent = label; b.disabled = disabled; }
+function toast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' '+type : '');
+  setTimeout(() => t.className = 'toast', 3500);
+}
+
+// ── SERVICE WORKER ────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
