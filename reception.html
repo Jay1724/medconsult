@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedConsult — Reception Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ── TOKENS ─────────────────────────────────────────────── */
+:root {
+  --black:#0a0a0b; --grey-900:#111113; --grey-800:#1c1c1f; --grey-700:#2a2a2f;
+  --grey-600:#3d3d45; --grey-500:#5a5a65; --grey-400:#7f7f8e; --grey-300:#a8a8b8;
+  --grey-200:#d0d0da; --grey-100:#e8e8ef; --grey-50:#f4f4f7; --white:#ffffff;
+  --azure:#2b7fff; --azure-light:#5b9fff; --azure-dark:#1a5fcc; --azure-dim:rgba(43,127,255,.12); --azure-glow:rgba(43,127,255,.25);
+  --bg:#f4f4f7; --surface:#ffffff; --surface2:#f0f0f5;
+  --ink:#111113; --ink2:#5a5a65; --ink3:#a8a8b8; --border:#d0d0da;
+  --success:#16a34a; --success-bg:#f0fdf4; --warning:#d97706; --warning-bg:#fffbeb;
+  --danger:#dc2626; --danger-bg:#fef2f2;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08),0 2px 6px rgba(0,0,0,.05);
+  --shadow-lg:0 12px 32px rgba(0,0,0,.1),0 4px 12px rgba(0,0,0,.06);
+  --radius:12px; --radius-sm:8px; --sidebar-w:260px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Sora',sans-serif;font-size:14px;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;outline:none}
+input,select,textarea{font-family:inherit;outline:none}
+a{text-decoration:none;color:inherit}
+
+/* ── LOADING SCREEN ──────────────────────────────────────── */
+#loading-screen{position:fixed;inset:0;background:var(--black);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px}
+.load-logo{font-family:'Playfair Display',serif;font-size:28px;color:var(--white);letter-spacing:-.5px}
+.load-logo span{color:var(--azure)}
+.load-spinner{width:32px;height:32px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--azure);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── LOGIN ───────────────────────────────────────────────── */
+#login-screen{position:fixed;inset:0;background:var(--black);display:none;align-items:center;justify-content:center;padding:24px}
+.login-card{background:var(--grey-900);border:1px solid var(--grey-700);border-radius:var(--radius);padding:40px;width:100%;max-width:420px}
+.login-logo{font-family:'Playfair Display',serif;font-size:24px;color:var(--white);margin-bottom:4px}
+.login-logo span{color:var(--azure)}
+.login-sub{font-size:13px;color:var(--grey-400);margin-bottom:32px}
+.login-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(43,127,255,.15);border:1px solid rgba(43,127,255,.3);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:600;color:var(--azure);letter-spacing:.5px;text-transform:uppercase;margin-bottom:24px}
+.lf{margin-bottom:16px}
+.lf label{display:block;font-size:12px;font-weight:600;color:var(--grey-300);margin-bottom:6px;letter-spacing:.3px;text-transform:uppercase}
+.lf input{width:100%;background:var(--grey-800);border:1px solid var(--grey-600);border-radius:var(--radius-sm);padding:12px 14px;color:var(--white);font-size:14px;transition:.2s}
+.lf input:focus{border-color:var(--azure);box-shadow:0 0 0 3px var(--azure-dim)}
+.lf input::placeholder{color:var(--grey-500)}
+.lf .field-error{display:block;font-size:11px;color:var(--danger);margin-top:5px;min-height:0}
+.login-btn{width:100%;padding:13px;background:var(--azure);color:var(--white);border-radius:var(--radius-sm);font-weight:600;font-size:14px;margin-top:8px;transition:.2s}
+.login-btn:hover{background:var(--azure-dark)}
+.login-btn:disabled{opacity:.5;cursor:not-allowed}
+.login-err{background:var(--danger-bg);border:1px solid var(--danger);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--danger);margin-bottom:16px;display:none}
+
+/* ── APP SHELL ───────────────────────────────────────────── */
+#app{display:none;height:100%;flex-direction:row}
+
+/* ── SIDEBAR ─────────────────────────────────────────────── */
+.sidebar{width:var(--sidebar-w);background:var(--black);display:flex;flex-direction:column;flex-shrink:0;height:100vh;position:sticky;top:0;overflow-y:auto}
+.sb-head{padding:24px 20px 20px}
+.sb-practice{font-size:11px;font-weight:600;color:var(--grey-500);letter-spacing:.5px;text-transform:uppercase;margin-bottom:4px}
+.sb-logo{font-family:'Playfair Display',serif;font-size:20px;color:var(--white)}
+.sb-logo span{color:var(--azure)}
+.sb-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(43,127,255,.15);border:1px solid rgba(43,127,255,.3);border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;color:var(--azure);letter-spacing:.8px;text-transform:uppercase;margin-top:8px}
+.sb-divider{height:1px;background:var(--grey-800);margin:0 20px}
+.sb-nav{padding:12px 12px;flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);color:var(--grey-400);font-size:13px;font-weight:500;cursor:pointer;transition:.15s;margin-bottom:2px;user-select:none}
+.nav-item:hover{background:var(--grey-800);color:var(--white)}
+.nav-item.active{background:var(--azure-dim);color:var(--azure);font-weight:600}
+.nav-icon{font-size:16px;width:20px;text-align:center}
+.sb-footer{padding:16px 20px;border-top:1px solid var(--grey-800)}
+.sb-user{display:flex;align-items:center;gap:10px}
+.sb-avatar{width:34px;height:34px;border-radius:50%;background:var(--azure-dim);border:1px solid var(--azure-glow);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--azure);flex-shrink:0}
+.sb-uname{font-size:13px;font-weight:600;color:var(--white);line-height:1.2}
+.sb-urole{font-size:11px;color:var(--grey-500)}
+.sb-logout{margin-left:auto;background:transparent;color:var(--grey-500);font-size:18px;padding:4px;transition:.15s;border-radius:4px}
+.sb-logout:hover{color:var(--danger)}
+
+/* ── MAIN ────────────────────────────────────────────────── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* ── TOPBAR ──────────────────────────────────────────────── */
+.topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px;height:60px;display:flex;align-items:center;gap:16px;flex-shrink:0;position:sticky;top:0;z-index:100}
+.topbar-hamburger{display:none;background:none;font-size:20px;color:var(--ink);padding:6px;border-radius:6px}
+.topbar-hamburger:hover{background:var(--grey-50)}
+.topbar-title{font-weight:700;font-size:16px;color:var(--ink);flex:1}
+.topbar-clock{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:var(--ink2);background:var(--grey-50);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 12px;letter-spacing:.5px}
+.topbar-search{display:flex;align-items:center;gap:8px;background:var(--grey-50);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;flex:0 0 240px}
+.topbar-search input{background:none;border:none;font-size:13px;color:var(--ink);width:100%}
+.topbar-search input::placeholder{color:var(--grey-400)}
+.topbar-search .si{color:var(--grey-400);font-size:14px}
+
+/* ── PAGE CONTENT ────────────────────────────────────────── */
+.page-wrap{flex:1;overflow-y:auto;padding:28px}
+.page{display:none}
+.page.active{display:block}
+.page-header{margin-bottom:24px}
+.page-header h1{font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);margin-bottom:4px}
+.page-header p{font-size:13px;color:var(--ink2)}
+
+/* ── CARDS ───────────────────────────────────────────────── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-sm)}
+.card-title{font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px}
+
+/* ── STAT CARDS ──────────────────────────────────────────── */
+.stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-sm)}
+.stat-label{font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.stat-value{font-size:32px;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace;line-height:1}
+.stat-sub{font-size:12px;color:var(--ink3);margin-top:4px}
+
+/* ── TABLE ───────────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;background:var(--surface)}
+th{font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;padding:12px 16px;text-align:left;background:var(--grey-50);border-bottom:1px solid var(--border)}
+td{padding:12px 16px;border-bottom:1px solid var(--grey-100);font-size:13px;color:var(--ink)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--grey-50)}
+.tbl-clickable{cursor:pointer}
+
+/* ── BADGES / PILLS ──────────────────────────────────────── */
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.3px}
+.pill-blue{background:var(--azure-dim);color:var(--azure)}
+.pill-green{background:var(--success-bg);color:var(--success)}
+.pill-yellow{background:var(--warning-bg);color:var(--warning)}
+.pill-red{background:var(--danger-bg);color:var(--danger)}
+.pill-grey{background:var(--grey-100);color:var(--grey-500)}
+.pill-purple{background:#f3e8ff;color:#7c3aed}
+
+/* ── SEARCH BAR ──────────────────────────────────────────── */
+.search-bar{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:20px;box-shadow:var(--shadow-sm)}
+.search-bar input{flex:1;border:none;background:none;font-size:14px;color:var(--ink)}
+.search-bar input::placeholder{color:var(--grey-400)}
+.search-icon{font-size:16px;color:var(--grey-400)}
+
+/* ── SKELETON ────────────────────────────────────────────── */
+.skel{background:linear-gradient(90deg,var(--grey-100) 25%,var(--grey-50) 50%,var(--grey-100) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:6px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-row{height:44px;margin-bottom:8px}
+.skel-stat{height:80px;border-radius:var(--radius)}
+
+/* ── EMPTY STATE ─────────────────────────────────────────── */
+.empty{text-align:center;padding:48px 24px}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+.empty-title{font-weight:600;font-size:15px;color:var(--ink);margin-bottom:6px}
+.empty-sub{font-size:13px;color:var(--ink2)}
+
+/* ── BUTTONS ─────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;transition:.15s;cursor:pointer}
+.btn-primary{background:var(--azure);color:var(--white)}
+.btn-primary:hover{background:var(--azure-dark)}
+.btn-secondary{background:var(--grey-50);color:var(--ink);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--grey-100)}
+.btn-danger{background:var(--danger-bg);color:var(--danger);border:1px solid rgba(220,38,38,.2)}
+.btn-danger:hover{background:var(--danger);color:var(--white)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── TOAST ───────────────────────────────────────────────── */
+#toast-rack{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:var(--grey-900);color:var(--white);border-radius:var(--radius-sm);padding:12px 16px;font-size:13px;font-weight:500;box-shadow:var(--shadow-lg);animation:toastIn .25s ease;display:flex;align-items:center;gap:8px;pointer-events:all;max-width:320px;border-left:3px solid var(--azure)}
+.toast.success{border-left-color:var(--success)}
+.toast.error{border-left-color:var(--danger)}
+.toast.warning{border-left-color:var(--warning)}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+/* ── MODAL ───────────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow-lg);width:100%;max-width:560px;max-height:90vh;overflow-y:auto}
+.modal-head{padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.modal-head h2{font-family:'Playfair Display',serif;font-size:20px}
+.modal-close{background:var(--grey-50);border:1px solid var(--border);width:32px;height:32px;border-radius:50%;font-size:18px;color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.modal-close:hover{background:var(--grey-100)}
+.modal-body{padding:0 24px 24px}
+.form-field{margin-bottom:16px}
+.form-field label{display:block;font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px}
+.form-field input,.form-field select,.form-field textarea{width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;color:var(--ink);background:var(--surface);transition:.2s}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--azure);box-shadow:0 0 0 3px var(--azure-dim)}
+.form-field textarea{resize:vertical;min-height:80px}
+.form-field .field-error{display:block;font-size:11px;color:var(--danger);margin-top:4px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+
+/* ── DASHBOARD ───────────────────────────────────────────── */
+.dash-date{font-size:13px;color:var(--ink2);margin-bottom:4px}
+.dash-heading{font-family:'Playfair Display',serif;font-size:28px;color:var(--ink);margin-bottom:24px}
+.appt-list-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--grey-100);transition:.15s}
+.appt-list-item:last-child{border-bottom:none}
+.appt-list-item:hover{background:var(--grey-50)}
+.appt-time{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;color:var(--ink2);width:52px;flex-shrink:0}
+.appt-name{font-weight:600;font-size:13px;color:var(--ink);flex:1}
+.appt-doctor{font-size:12px;color:var(--ink2)}
+.appt-type{font-size:12px;color:var(--ink3)}
+
+/* ── APPOINTMENTS (WEEKLY CALENDAR) ──────────────────────── */
+.cal-controls{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+.cal-controls .week-label{font-weight:600;font-size:15px;flex:1;text-align:center}
+.cal-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)}
+.cal-grid{display:grid;min-width:700px}
+.cal-head{display:grid;border-bottom:2px solid var(--border)}
+.cal-head-time{width:64px;flex-shrink:0;padding:12px 8px;font-size:11px;color:var(--ink3);text-align:center;border-right:1px solid var(--border)}
+.cal-head-doc{flex:1;padding:10px 12px;border-right:1px solid var(--border);text-align:center}
+.cal-head-doc:last-child{border-right:none}
+.cal-doc-name{font-weight:600;font-size:13px;color:var(--ink)}
+.cal-doc-spec{font-size:11px;color:var(--ink2)}
+.cal-body{position:relative}
+.cal-row{display:flex;border-bottom:1px solid var(--grey-100);min-height:48px}
+.cal-row:last-child{border-bottom:none}
+.cal-time-cell{width:64px;flex-shrink:0;padding:4px 8px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink3);text-align:center;border-right:1px solid var(--border);display:flex;align-items:center;justify-content:center}
+.cal-slot{flex:1;border-right:1px solid var(--grey-100);padding:4px;cursor:pointer;transition:.1s;min-height:48px;position:relative}
+.cal-slot:last-child{border-right:none}
+.cal-slot:hover{background:var(--azure-dim)}
+.cal-appt{background:var(--azure);color:var(--white);border-radius:4px;padding:3px 6px;font-size:11px;font-weight:600;margin-bottom:2px;cursor:pointer;transition:.15s;line-height:1.3}
+.cal-appt:hover{background:var(--azure-dark)}
+.cal-appt.confirmed{background:var(--azure)}
+.cal-appt.arrived{background:var(--success)}
+.cal-appt.in_consultation{background:#7c3aed}
+.cal-appt.completed{background:var(--grey-400)}
+.cal-appt.no_show{background:var(--danger)}
+.cal-day-tabs{display:flex;gap:4px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px}
+.cal-day-tab{padding:7px 14px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--ink2);white-space:nowrap;transition:.15s;flex-shrink:0}
+.cal-day-tab.active{background:var(--azure);color:var(--white);border-color:var(--azure)}
+.cal-day-tab:hover:not(.active){background:var(--grey-50)}
+
+/* ── PATIENTS ────────────────────────────────────────────── */
+.clinical-banner{background:#fffbeb;border:1px solid #fcd34d;border-radius:var(--radius-sm);padding:14px 18px;display:flex;align-items:flex-start;gap:12px;margin-bottom:24px}
+.clinical-banner .cb-icon{font-size:20px;flex-shrink:0;margin-top:1px}
+.clinical-banner .cb-title{font-weight:700;font-size:13px;color:#92400e;margin-bottom:2px}
+.clinical-banner .cb-text{font-size:12px;color:#78350f}
+.pat-detail-head{display:flex;align-items:center;gap:16px;margin-bottom:24px}
+.pat-avatar-lg{width:56px;height:56px;border-radius:50%;background:var(--azure-dim);border:2px solid var(--azure-glow);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--azure);flex-shrink:0}
+.pat-name-lg{font-family:'Playfair Display',serif;font-size:22px;color:var(--ink)}
+.pat-sub-lg{font-size:13px;color:var(--ink2)}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.info-row{display:contents}
+.info-label{padding:10px 14px;background:var(--grey-50);font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
+.info-value{padding:10px 14px;font-size:13px;color:var(--ink);border-bottom:1px solid var(--border);border-left:1px solid var(--border)}
+.info-label:nth-last-child(-n+2){border-bottom:none}
+.info-value:nth-last-child(-n+1){border-bottom:none}
+.section-title{font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.5px;margin:24px 0 12px;display:flex;align-items:center;gap:8px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── DOCTORS ─────────────────────────────────────────────── */
+.doctor-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:16px;cursor:pointer;transition:.15s;margin-bottom:12px}
+.doctor-card:hover{box-shadow:var(--shadow-md);border-color:var(--azure-glow)}
+.doc-avatar{width:48px;height:48px;border-radius:50%;background:var(--azure-dim);border:2px solid var(--azure-glow);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:var(--azure);flex-shrink:0}
+.doc-info{flex:1}
+.doc-name{font-weight:700;font-size:15px;color:var(--ink);margin-bottom:2px}
+.doc-spec{font-size:12px;color:var(--ink2)}
+.doc-stats{display:flex;gap:12px;align-items:center;flex-shrink:0}
+.doc-stat-item{text-align:center}
+.doc-stat-val{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--ink)}
+.doc-stat-lbl{font-size:10px;color:var(--ink3);text-transform:uppercase;letter-spacing:.3px}
+.avail-badge{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.3px}
+.avail-available{background:var(--success-bg);color:var(--success)}
+.avail-in_consultation{background:#f3e8ff;color:#7c3aed}
+.avail-unavailable{background:var(--grey-100);color:var(--grey-500)}
+
+/* ── AVAIL SCHEDULE ──────────────────────────────────────── */
+.avail-week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-top:16px}
+.avail-day-col{border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.avail-day-hd{background:var(--grey-50);padding:8px;text-align:center;font-size:11px;font-weight:700;color:var(--ink2);text-transform:uppercase;letter-spacing:.3px;border-bottom:1px solid var(--border)}
+.avail-day-off{padding:12px 8px;text-align:center;font-size:11px;color:var(--ink3)}
+.avail-day-on{padding:8px;text-align:center;font-size:12px;color:var(--ink);font-weight:500}
+
+/* ── PATIENT SEARCH RESULTS ──────────────────────────────── */
+.pat-search-result{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);position:absolute;top:100%;left:0;right:0;z-index:200;max-height:240px;overflow-y:auto;display:none}
+.pat-search-result.open{display:block}
+.pat-search-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--grey-100);font-size:13px}
+.pat-search-item:hover{background:var(--grey-50)}
+.pat-search-item:last-child{border-bottom:none}
+.pat-search-item strong{display:block;color:var(--ink)}
+.pat-search-item span{font-size:11px;color:var(--ink2)}
+
+/* ── SLOT CHIPS ──────────────────────────────────────────── */
+.slot-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.slot-chip{padding:7px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;transition:.15s;background:var(--surface)}
+.slot-chip:hover{border-color:var(--azure);color:var(--azure)}
+.slot-chip.selected{background:var(--azure);color:var(--white);border-color:var(--azure)}
+.slot-chip.unavailable{background:var(--grey-50);color:var(--ink3);cursor:not-allowed;text-decoration:line-through}
+
+/* ── SIDEBAR OVERLAY (MOBILE) ────────────────────────────── */
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199}
+.sb-overlay.open{display:block}
+
+/* ── RESPONSIVE ──────────────────────────────────────────── */
+@media(max-width:768px){
+  .sidebar{position:fixed;left:-280px;top:0;bottom:0;z-index:200;transition:left .25s ease;height:100%}
+  .sidebar.open{left:0}
+  .topbar-hamburger{display:flex}
+  .page-wrap{padding:16px}
+  .stat-row{grid-template-columns:1fr 1fr}
+  .form-row{grid-template-columns:1fr}
+  .info-grid{grid-template-columns:1fr}
+  .info-value{border-left:none}
+  .avail-week{grid-template-columns:repeat(4,1fr)}
+  .doc-stats{flex-direction:column;gap:4px}
+  .cal-day-tabs{gap:6px}
+}
+@media(max-width:420px){
+  .stat-row{grid-template-columns:1fr}
+  .avail-week{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="load-logo">Med<span>Consult</span></div>
+  <div class="load-spinner"></div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-badge">🏥 Reception Portal</div>
+    <div class="login-logo">Med<span>Consult</span></div>
+    <div class="login-sub">Sign in to your MedConsult Reception account</div>
+    <div id="login-err" class="login-err"></div>
+    <div class="lf"><label>Email Address</label><input type="email" id="l-email" placeholder="reception@practice.co.za" autocomplete="username"><span class="field-error" id="err-l-email"></span></div>
+    <div class="lf"><label>Password</label><input type="password" id="l-pass" placeholder="Your password" autocomplete="current-password"><span class="field-error" id="err-l-pass"></span></div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In →</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="sb-practice" id="sb-practice">Practice</div>
+      <div class="sb-logo">Med<span>Consult</span></div>
+      <div class="sb-badge">🏥 Reception</div>
+    </div>
+    <div class="sb-divider"></div>
+    <nav class="sb-nav">
+      <div class="nav-item active" onclick="nav('dashboard',this)" id="ni-dashboard"><span class="nav-icon">📊</span> Dashboard</div>
+      <div class="nav-item" onclick="nav('appointments',this)" id="ni-appointments"><span class="nav-icon">📅</span> Appointments</div>
+      <div class="nav-item" onclick="nav('patients',this)" id="ni-patients"><span class="nav-icon">👤</span> Patients</div>
+      <div class="nav-item" onclick="nav('doctors',this)" id="ni-doctors"><span class="nav-icon">🩺</span> Doctors</div>
+    </nav>
+    <div class="sb-footer">
+      <div class="sb-user">
+        <div class="sb-avatar" id="sb-avatar">R</div>
+        <div>
+          <div class="sb-uname" id="sb-uname">Receptionist</div>
+          <div class="sb-urole" id="sb-urole">Reception Staff</div>
+        </div>
+        <button class="sb-logout" onclick="doLogout()" title="Log out">↩</button>
+      </div>
+    </div>
+  </div>
+  <div class="sb-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <button class="topbar-hamburger" onclick="openSidebar()">☰</button>
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="topbar-clock" id="topbar-clock">--:--</div>
+    </div>
+
+    <div class="page-wrap">
+
+      <!-- DASHBOARD -->
+      <div class="page active" id="pg-dashboard">
+        <div class="dash-date" id="dash-date"></div>
+        <div class="dash-heading" id="dash-heading">Good morning</div>
+        <div class="stat-row" id="dash-stats">
+          <div class="skel skel-stat"></div>
+          <div class="skel skel-stat"></div>
+          <div class="skel skel-stat"></div>
+          <div class="skel skel-stat"></div>
+        </div>
+        <div class="search-bar" style="margin-bottom:20px">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="dash-search" placeholder="Search patients by name…" oninput="dashSearch(this.value)">
+        </div>
+        <div class="card">
+          <div class="card-title">Today's Appointments</div>
+          <div id="dash-appt-list"><div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div></div>
+        </div>
+      </div>
+
+      <!-- APPOINTMENTS -->
+      <div class="page" id="pg-appointments">
+        <div class="page-header">
+          <h1>Appointments</h1>
+          <p>Weekly view — click any slot to book, click an appointment to manage</p>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <div class="cal-day-tabs" id="cal-day-tabs"></div>
+          <button class="btn btn-primary btn-sm" onclick="openBooking()">+ New Appointment</button>
+        </div>
+        <div class="cal-controls">
+          <button class="btn btn-secondary btn-sm" onclick="weekMove(-1)">‹ Prev</button>
+          <div class="week-label" id="week-label"></div>
+          <button class="btn btn-secondary btn-sm" onclick="weekToday()">Today</button>
+          <button class="btn btn-secondary btn-sm" onclick="weekMove(1)">Next ›</button>
+        </div>
+        <div class="cal-wrap">
+          <div id="cal-grid-inner"></div>
+        </div>
+      </div>
+
+      <!-- PATIENTS -->
+      <div class="page" id="pg-patients">
+        <div class="page-header">
+          <h1>Patients</h1>
+          <p>Demographics only — no clinical records accessible from this portal</p>
+        </div>
+        <div class="clinical-banner">
+          <div class="cb-icon">⚠️</div>
+          <div>
+            <div class="cb-title">Clinical records are not accessible from the reception portal</div>
+            <div class="cb-text">Contact the treating doctor for clinical information including diagnoses, prescriptions, sick notes, and consultation notes.</div>
+          </div>
+        </div>
+        <div class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="pat-search" placeholder="Search patients by name, phone or email…" oninput="filterPatients(this.value)">
+        </div>
+        <div id="pat-list-wrap">
+          <div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div>
+        </div>
+        <div id="pat-detail" style="display:none">
+          <button class="btn btn-secondary btn-sm" onclick="backToPatients()" style="margin-bottom:16px">← Back to Patients</button>
+          <div id="pat-detail-inner"></div>
+        </div>
+      </div>
+
+      <!-- DOCTORS -->
+      <div class="page" id="pg-doctors">
+        <div class="page-header">
+          <h1>Doctors</h1>
+          <p>Practice staff — click a doctor to view their weekly availability</p>
+        </div>
+        <div id="doc-list"></div>
+        <div id="doc-detail" style="display:none">
+          <button class="btn btn-secondary btn-sm" onclick="backToDoctors()" style="margin-bottom:16px">← Back to Doctors</button>
+          <div id="doc-detail-inner"></div>
+        </div>
+      </div>
+
+    </div><!-- /page-wrap -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- TOAST RACK -->
+<div id="toast-rack"></div>
+
+<!-- BOOK APPOINTMENT MODAL -->
+<div class="modal-overlay" id="modal-booking">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="booking-modal-title">New Appointment</h2>
+      <button class="modal-close" onclick="closeBooking()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field" style="position:relative">
+        <label>Patient</label>
+        <input type="text" id="bk-pat-search" placeholder="Search patient name…" oninput="searchPatientDropdown(this.value)" autocomplete="off">
+        <div class="pat-search-result" id="bk-pat-results"></div>
+        <input type="hidden" id="bk-pat-id">
+        <span class="field-error" id="err-bk-pat"></span>
+      </div>
+      <div class="form-row">
+        <div class="form-field">
+          <label>Doctor</label>
+          <select id="bk-doctor" onchange="loadSlots()">
+            <option value="">Select doctor…</option>
+          </select>
+          <span class="field-error" id="err-bk-doctor"></span>
+        </div>
+        <div class="form-field">
+          <label>Date</label>
+          <input type="date" id="bk-date" onchange="loadSlots()">
+          <span class="field-error" id="err-bk-date"></span>
+        </div>
+      </div>
+      <div class="form-field">
+        <label>Available Time Slots</label>
+        <div class="slot-grid" id="bk-slots"><div style="font-size:13px;color:var(--ink3)">Select a doctor and date to see slots</div></div>
+        <input type="hidden" id="bk-slot">
+        <span class="field-error" id="err-bk-slot"></span>
+      </div>
+      <div class="form-field">
+        <label>Appointment Type</label>
+        <select id="bk-type">
+          <option value="consultation">Consultation</option>
+          <option value="follow_up">Follow-up</option>
+          <option value="procedure">Procedure</option>
+          <option value="emergency">Emergency</option>
+          <option value="check_up">Check-up</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label>Notes (optional)</label>
+        <textarea id="bk-notes" placeholder="Reason for visit or additional notes…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeBooking()">Cancel</button>
+      <button class="btn btn-primary" id="bk-submit-btn" onclick="submitBooking()">Book Appointment</button>
+    </div>
+  </div>
+</div>
+
+<!-- APPOINTMENT DETAIL MODAL -->
+<div class="modal-overlay" id="modal-appt-detail">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Appointment Details</h2>
+      <button class="modal-close" onclick="closeApptDetail()">×</button>
+    </div>
+    <div class="modal-body" id="appt-detail-body"></div>
+    <div class="modal-foot" id="appt-detail-foot"></div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ── STATE ─────────────────────────────────────────────────── */
+const R = { user: null, member: null, practice: null, doctors: [], patients: [], todayAppts: [] };
+let weekOffset = 0;
+let calSelectedDay = null;
+let editingApptId = null;
+let allPatients = [];
+
+/* ── HELPERS ───────────────────────────────────────────────── */
+function esc(s){ const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
+function fmtDate(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'}); }
+function fmtTime(t){ if(!t) return '—'; const [h,m]=t.split(':'); const hr=parseInt(h); return `${hr>12?hr-12:hr===0?12:hr}:${m} ${hr>=12?'PM':'AM'}`; }
+function isoToday(){ return new Date().toISOString().slice(0,10); }
+function getWeekStart(offset=0){ const d=new Date(); d.setDate(d.getDate()-d.getDay()+1+offset*7); return d; }
+function addDays(d,n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+function isoDate(d){ return d.toISOString().slice(0,10); }
+function capitalise(s){ return s?s.charAt(0).toUpperCase()+s.slice(1).replace(/_/g,' '):''; }
+function initials(n){ if(!n) return '?'; return n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2); }
+function greeting(){ const h=new Date().getHours(); return h<12?'Good morning':h<17?'Good afternoon':'Good evening'; }
+function statusPill(st){
+  const map={confirmed:'pill-blue',arrived:'pill-green',in_consultation:'pill-purple',completed:'pill-grey',no_show:'pill-red',pending:'pill-yellow'};
+  return `<span class="pill ${map[st]||'pill-grey'}">${capitalise(st)}</span>`;
+}
+
+function toast(msg, type='info'){
+  const rack=document.getElementById('toast-rack');
+  const t=document.createElement('div');
+  t.className=`toast ${type}`;
+  const icons={info:'ℹ️',success:'✅',error:'❌',warning:'⚠️'};
+  t.innerHTML=`<span>${icons[type]||'ℹ️'}</span><span>${esc(msg)}</span>`;
+  rack.appendChild(t);
+  setTimeout(()=>t.remove(),4000);
+}
+
+/* ── CLOCK ─────────────────────────────────────────────────── */
+function tickClock(){
+  const now=new Date();
+  document.getElementById('topbar-clock').textContent=
+    now.toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',hour12:false});
+}
+tickClock(); setInterval(tickClock,30000);
+
+/* ── SIDEBAR ────────────────────────────────────────────────── */
+function openSidebar(){ document.getElementById('sidebar').classList.add('open'); document.getElementById('sb-overlay').classList.add('open'); }
+function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sb-overlay').classList.remove('open'); }
+
+/* ── NAV ────────────────────────────────────────────────────── */
+const PAGE_TITLES = { dashboard:'Dashboard', appointments:'Appointments', patients:'Patients', doctors:'Doctors' };
+function nav(pg, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('pg-'+pg).classList.add('active');
+  if(el) el.classList.add('active'); else document.getElementById('ni-'+pg).classList.add('active');
+  document.getElementById('topbar-title').textContent = PAGE_TITLES[pg]||pg;
+  closeSidebar();
+  if(pg==='dashboard') loadDashboard();
+  if(pg==='appointments') loadCalendar();
+  if(pg==='patients') loadPatients();
+  if(pg==='doctors') loadDoctors();
+}
+
+/* ── AUTH ───────────────────────────────────────────────────── */
+async function doLogin(){
+  const email=document.getElementById('l-email').value.trim();
+  const pass=document.getElementById('l-pass').value;
+  document.getElementById('err-l-email').textContent='';
+  document.getElementById('err-l-pass').textContent='';
+  let ok=true;
+  if(!email){ document.getElementById('err-l-email').textContent='Email is required'; ok=false; }
+  if(!pass){ document.getElementById('err-l-pass').textContent='Password is required'; ok=false; }
+  if(!ok) return;
+  const btn=document.getElementById('login-btn');
+  btn.textContent='Signing in…'; btn.disabled=true;
+  const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  btn.textContent='Sign In →'; btn.disabled=false;
+  if(error){ document.getElementById('err-l-email').textContent=error.message; return; }
+  await verifyAndLaunch(data.user);
+}
+
+async function verifyAndLaunch(user){
+  /* Check practice_members for this auth_id with an accepted role */
+  const {data:member,error}=await sb.from('practice_members')
+    .select('role,practice_id,practices(name)')
+    .eq('auth_id',user.id)
+    .in('role',['receptionist','admin','owner'])
+    .maybeSingle();
+  if(error||!member){
+    await sb.auth.signOut();
+    showLogin('Access denied — this portal is for reception staff only.');
+    return;
+  }
+  R.user=user; R.member=member;
+  R.practice={ id:member.practice_id, name:member.practices?.name||'Your Practice' };
+  setupUI();
+}
+
+function setupUI(){
+  const meta=R.user.user_metadata||{};
+  const name=meta.fn ? `${meta.fn} ${meta.ln||''}`.trim() : R.user.email;
+  document.getElementById('sb-practice').textContent=R.practice.name;
+  document.getElementById('sb-uname').textContent=name;
+  document.getElementById('sb-urole').textContent=capitalise(R.member.role);
+  document.getElementById('sb-avatar').textContent=initials(name);
+  showApp();
+  loadDashboard();
+  loadDoctorsCache();
+  loadPatientsCache();
+}
+
+function showApp(){
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+}
+function showLogin(errMsg){
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  if(errMsg){ const e=document.getElementById('login-err'); e.style.display='block'; e.textContent=errMsg; }
+}
+
+async function doLogout(){
+  await sb.auth.signOut();
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-err').style.display='none';
+  document.getElementById('l-email').value='';
+  document.getElementById('l-pass').value='';
+  toast('Signed out successfully','success');
+}
+
+/* ── BOOT ───────────────────────────────────────────────────── */
+(async()=>{
+  const {data:{session}}=await sb.auth.getSession();
+  if(session){ await verifyAndLaunch(session.user); }
+  else{ showLogin(); }
+})();
+
+/* ── DASHBOARD ──────────────────────────────────────────────── */
+async function loadDashboard(){
+  const today=isoToday();
+  const now=new Date();
+  document.getElementById('dash-date').textContent=now.toLocaleDateString('en-ZA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('dash-heading').textContent=`${greeting()}, ${(R.user?.user_metadata?.fn||'').split(' ')[0]||'Welcome'}`;
+
+  const {data:appts}=await sb.from('appointments')
+    .select('id,time,status,type,patients(first_name,last_name),doctors(first_name,last_name)')
+    .eq('date',today)
+    .order('time');
+
+  R.todayAppts=appts||[];
+  renderDashStats(R.todayAppts);
+  renderDashAppts(R.todayAppts);
+}
+
+function renderDashStats(appts){
+  const total=appts.length;
+  const confirmed=appts.filter(a=>a.status==='confirmed').length;
+  const arrived=appts.filter(a=>a.status==='arrived').length;
+  const completed=appts.filter(a=>a.status==='completed').length;
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Total Today</div><div class="stat-value">${total}</div><div class="stat-sub">appointments</div></div>
+    <div class="stat-card"><div class="stat-label">Confirmed</div><div class="stat-value">${confirmed}</div><div class="stat-sub">awaiting</div></div>
+    <div class="stat-card"><div class="stat-label">Arrived</div><div class="stat-value">${arrived}</div><div class="stat-sub">checked in</div></div>
+    <div class="stat-card"><div class="stat-label">Completed</div><div class="stat-value">${completed}</div><div class="stat-sub">seen today</div></div>
+  `;
+}
+
+function renderDashAppts(appts, filter=''){
+  const list=document.getElementById('dash-appt-list');
+  const filtered=filter ? appts.filter(a=>{
+    const n=`${a.patients?.first_name||''} ${a.patients?.last_name||''}`.toLowerCase();
+    return n.includes(filter.toLowerCase());
+  }) : appts;
+  if(!filtered.length){ list.innerHTML=`<div class="empty"><div class="empty-icon">📭</div><div class="empty-title">No appointments${filter?' found':' today'}</div></div>`; return; }
+  list.innerHTML=filtered.map(a=>`
+    <div class="appt-list-item tbl-clickable" onclick="openApptDetail('${a.id}')">
+      <div class="appt-time">${fmtTime(a.time)}</div>
+      <div style="flex:1">
+        <div class="appt-name">${esc(a.patients?.first_name+' '+a.patients?.last_name)}</div>
+        <div class="appt-doctor">Dr. ${esc(a.doctors?.first_name+' '+a.doctors?.last_name)} · <span class="appt-type">${capitalise(a.type)}</span></div>
+      </div>
+      ${statusPill(a.status)}
+    </div>
+  `).join('');
+}
+function dashSearch(v){ renderDashAppts(R.todayAppts, v); }
+
+/* ── CACHE LOADERS ──────────────────────────────────────────── */
+async function loadDoctorsCache(){
+  const {data}=await sb.from('doctors')
+    .select('id,first_name,last_name,specialization,auth_id')
+    .order('first_name');
+  R.doctors=data||[];
+  populateDoctorSelect();
+}
+async function loadPatientsCache(){
+  const {data}=await sb.from('patients').select('id,first_name,last_name,dob,id_number,phone,email,address,medical_aid_provider,medical_aid_number,medical_aid_plan,medical_aid_principal,doctor_id').order('last_name');
+  allPatients=data||[];
+}
+
+/* ── APPOINTMENTS / CALENDAR ────────────────────────────────── */
+let weekAppts=[];
+let calDays=[];
+
+async function loadCalendar(){
+  const ws=getWeekStart(weekOffset);
+  calDays=Array.from({length:7},(_,i)=>addDays(ws,i));
+  const from=isoDate(calDays[0]);
+  const to=isoDate(calDays[6]);
+  document.getElementById('week-label').textContent=
+    `${calDays[0].toLocaleDateString('en-ZA',{day:'numeric',month:'short'})} – ${calDays[6].toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'})}`;
+  renderDayTabs();
+  if(!calSelectedDay) calSelectedDay=isoDate(calDays.find(d=>isoDate(d)===isoToday())||calDays[0]);
+
+  const {data:appts}=await sb.from('appointments')
+    .select('id,date,time,status,type,notes,patients(id,first_name,last_name),doctors(id,first_name,last_name)')
+    .gte('date',from).lte('date',to)
+    .order('time');
+  weekAppts=appts||[];
+  renderCalGrid();
+}
+
+function renderDayTabs(){
+  const tabs=document.getElementById('cal-day-tabs');
+  tabs.innerHTML=calDays.map(d=>{
+    const iso=isoDate(d);
+    const lbl=d.toLocaleDateString('en-ZA',{weekday:'short',day:'numeric'});
+    const isToday=iso===isoToday();
+    return `<div class="cal-day-tab${iso===calSelectedDay?' active':''}" onclick="selectCalDay('${iso}')">${isToday?'<strong>'+lbl+'</strong>':lbl}</div>`;
+  }).join('');
+}
+
+function selectCalDay(iso){ calSelectedDay=iso; renderDayTabs(); renderCalGrid(); }
+
+function renderCalGrid(){
+  const HOURS=Array.from({length:13},(_,i)=>`${(7+i).toString().padStart(2,'0')}:00`);
+  const dayAppts=weekAppts.filter(a=>a.date===calSelectedDay);
+  const doctors=R.doctors.length ? R.doctors : [{id:'',first_name:'No',last_name:'Doctors'}];
+
+  let head=`<div class="cal-head" style="display:flex">
+    <div class="cal-head-time"></div>
+    ${doctors.map(d=>`<div class="cal-head-doc" style="flex:1"><div class="cal-doc-name">Dr. ${esc(d.first_name)} ${esc(d.last_name)}</div><div class="cal-doc-spec">${esc(d.specialization||'')}</div></div>`).join('')}
+  </div>`;
+
+  let rows=HOURS.map(h=>{
+    const cells=doctors.map(doc=>{
+      const slotAppts=dayAppts.filter(a=>a.doctors?.id===doc.id&&a.time&&a.time.startsWith(h.slice(0,2)));
+      const pills=slotAppts.map(a=>`
+        <div class="cal-appt ${a.status||''}" onclick="openApptDetail('${a.id}');event.stopPropagation()">
+          ${esc(a.patients?.first_name||'')} ${esc(a.patients?.last_name||'')}
+        </div>`).join('');
+      return `<div class="cal-slot" onclick="openBookingAt('${doc.id}','${calSelectedDay}','${h}')">${pills}</div>`;
+    }).join('');
+    return `<div class="cal-row">
+      <div class="cal-time-cell">${fmtTime(h+':00').replace(':00','')}</div>
+      ${cells}
+    </div>`;
+  }).join('');
+
+  document.getElementById('cal-grid-inner').innerHTML=`<div style="display:flex;flex-direction:column">${head}<div class="cal-body">${rows}</div></div>`;
+}
+
+function weekMove(dir){ weekOffset+=dir; loadCalendar(); }
+function weekToday(){ weekOffset=0; calSelectedDay=isoToday(); loadCalendar(); }
+
+/* ── BOOKING MODAL ──────────────────────────────────────────── */
+function openBooking(){ editingApptId=null; resetBookingForm(); document.getElementById('booking-modal-title').textContent='New Appointment'; document.getElementById('modal-booking').classList.add('open'); }
+function openBookingAt(docId, date, time){
+  openBooking();
+  if(docId) document.getElementById('bk-doctor').value=docId;
+  if(date) document.getElementById('bk-date').value=date;
+  if(time){ loadSlots().then(()=>{ document.querySelectorAll('.slot-chip').forEach(c=>{ if(c.dataset.time===time) c.click(); }); }); } else loadSlots();
+}
+function closeBooking(){ document.getElementById('modal-booking').classList.remove('open'); }
+
+function resetBookingForm(){
+  ['bk-pat-search','bk-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('bk-pat-id').value='';
+  document.getElementById('bk-date').value=isoToday();
+  document.getElementById('bk-slot').value='';
+  document.getElementById('bk-slots').innerHTML='<div style="font-size:13px;color:var(--ink3)">Select a doctor and date to see slots</div>';
+  document.getElementById('bk-pat-results').classList.remove('open');
+  ['bk-pat','bk-doctor','bk-date','bk-slot'].forEach(id=>{ const el=document.getElementById('err-'+id); if(el) el.textContent=''; });
+}
+
+function populateDoctorSelect(){
+  const sel=document.getElementById('bk-doctor');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Select doctor…</option>'+R.doctors.map(d=>`<option value="${d.id}">Dr. ${esc(d.first_name)} ${esc(d.last_name)}</option>`).join('');
+  if(cur) sel.value=cur;
+}
+
+async function loadSlots(){
+  const docId=document.getElementById('bk-doctor').value;
+  const date=document.getElementById('bk-date').value;
+  const wrap=document.getElementById('bk-slots');
+  if(!docId||!date){ wrap.innerHTML='<div style="font-size:13px;color:var(--ink3)">Select a doctor and date to see slots</div>'; return; }
+  wrap.innerHTML='<div style="font-size:13px;color:var(--ink2)">Loading slots…</div>';
+  const {data,error}=await sb.rpc('get_available_slots',{p_doctor_id:docId,p_date:date});
+  if(error||!data?.length){ wrap.innerHTML='<div style="font-size:13px;color:var(--ink3)">No available slots for this date</div>'; return; }
+  document.getElementById('bk-slot').value='';
+  wrap.innerHTML=data.map(s=>`<div class="slot-chip${s.available===false?' unavailable':''}" data-time="${s.slot_time||s}" onclick="selectSlot(this,'${s.slot_time||s}')">${fmtTime(s.slot_time||s)}</div>`).join('');
+}
+
+function selectSlot(el, time){
+  if(el.classList.contains('unavailable')) return;
+  document.querySelectorAll('.slot-chip').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('bk-slot').value=time;
+}
+
+async function submitBooking(){
+  const patId=document.getElementById('bk-pat-id').value;
+  const docId=document.getElementById('bk-doctor').value;
+  const date=document.getElementById('bk-date').value;
+  const slot=document.getElementById('bk-slot').value;
+  let ok=true;
+  ['bk-pat','bk-doctor','bk-date','bk-slot'].forEach(id=>{ const el=document.getElementById('err-'+id); if(el) el.textContent=''; });
+  if(!patId){ document.getElementById('err-bk-pat').textContent='Please select a patient'; ok=false; }
+  if(!docId){ document.getElementById('err-bk-doctor').textContent='Please select a doctor'; ok=false; }
+  if(!date){ document.getElementById('err-bk-date').textContent='Please select a date'; ok=false; }
+  if(!slot){ document.getElementById('err-bk-slot').textContent='Please select a time slot'; ok=false; }
+  if(!ok) return;
+  const type=document.getElementById('bk-type').value;
+  const notes=document.getElementById('bk-notes').value.trim();
+  const btn=document.getElementById('bk-submit-btn');
+  btn.disabled=true; btn.textContent='Booking…';
+  const payload={ patient_id:patId, doctor_id:docId, date, time:slot, type, notes, status:'confirmed' };
+  let error;
+  if(editingApptId){
+    ({error}=await sb.from('appointments').update(payload).eq('id',editingApptId));
+  } else {
+    ({error}=await sb.from('appointments').insert(payload));
+  }
+  btn.disabled=false; btn.textContent='Book Appointment';
+  if(error){ toast(error.message,'error'); return; }
+  toast(editingApptId?'Appointment updated':'Appointment booked successfully','success');
+  closeBooking(); loadCalendar(); loadDashboard();
+}
+
+/* ── PATIENT SEARCH DROPDOWN (in booking modal) ─────────────── */
+function searchPatientDropdown(val){
+  const res=document.getElementById('bk-pat-results');
+  if(!val||val.length<2){ res.classList.remove('open'); return; }
+  const matches=allPatients.filter(p=>`${p.first_name} ${p.last_name}`.toLowerCase().includes(val.toLowerCase())).slice(0,8);
+  if(!matches.length){ res.classList.remove('open'); return; }
+  res.innerHTML=matches.map(p=>`<div class="pat-search-item" onclick="selectBookingPatient('${p.id}','${esc(p.first_name+' '+p.last_name)}')">
+    <strong>${esc(p.first_name+' '+p.last_name)}</strong>
+    <span>${esc(p.phone||p.email||'')}</span>
+  </div>`).join('');
+  res.classList.add('open');
+}
+function selectBookingPatient(id,name){
+  document.getElementById('bk-pat-id').value=id;
+  document.getElementById('bk-pat-search').value=name;
+  document.getElementById('bk-pat-results').classList.remove('open');
+}
+
+/* ── APPOINTMENT DETAIL ─────────────────────────────────────── */
+const STATUSES=['confirmed','arrived','in_consultation','completed','no_show'];
+async function openApptDetail(id){
+  const appt=weekAppts.find(a=>a.id===id)||R.todayAppts.find(a=>a.id===id);
+  if(!appt){ const {data}=await sb.from('appointments').select('*,patients(first_name,last_name),doctors(first_name,last_name)').eq('id',id).single(); if(data) renderApptDetail(data); return; }
+  renderApptDetail(appt);
+}
+function renderApptDetail(a){
+  const body=document.getElementById('appt-detail-body');
+  body.innerHTML=`
+    <div style="margin-bottom:20px">
+      <div style="font-size:13px;color:var(--ink2);margin-bottom:4px">${fmtDate(a.date)} at ${fmtTime(a.time)}</div>
+      <div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:2px">${esc(a.patients?.first_name+' '+a.patients?.last_name)}</div>
+      <div style="font-size:13px;color:var(--ink2)">Dr. ${esc(a.doctors?.first_name+' '+a.doctors?.last_name)} · ${capitalise(a.type)}</div>
+    </div>
+    <div style="margin-bottom:16px">${statusPill(a.status)}</div>
+    ${a.notes?`<div style="background:var(--grey-50);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--ink2);margin-bottom:16px">${esc(a.notes)}</div>`:''}
+    <div class="form-field"><label>Update Status</label>
+      <select id="detail-status">${STATUSES.map(s=>`<option value="${s}"${s===a.status?' selected':''}>${capitalise(s)}</option>`).join('')}</select>
+    </div>`;
+  const foot=document.getElementById('appt-detail-foot');
+  foot.innerHTML=`
+    <button class="btn btn-danger btn-sm" onclick="cancelAppt('${a.id}')">Cancel Appointment</button>
+    <button class="btn btn-secondary" onclick="closeApptDetail()">Close</button>
+    <button class="btn btn-primary" onclick="saveApptStatus('${a.id}')">Save Status</button>`;
+  document.getElementById('modal-appt-detail').classList.add('open');
+}
+function closeApptDetail(){ document.getElementById('modal-appt-detail').classList.remove('open'); }
+async function saveApptStatus(id){
+  const status=document.getElementById('detail-status').value;
+  const {error}=await sb.from('appointments').update({status}).eq('id',id);
+  if(error){ toast(error.message,'error'); return; }
+  toast('Status updated','success'); closeApptDetail(); loadCalendar(); loadDashboard();
+}
+async function cancelAppt(id){
+  if(!confirm('Cancel this appointment?')) return;
+  const {error}=await sb.from('appointments').update({status:'cancelled'}).eq('id',id);
+  if(error){ toast(error.message,'error'); return; }
+  toast('Appointment cancelled','success'); closeApptDetail(); loadCalendar(); loadDashboard();
+}
+
+/* ── PATIENTS ───────────────────────────────────────────────── */
+async function loadPatients(){
+  document.getElementById('pat-list-wrap').style.display='block';
+  document.getElementById('pat-detail').style.display='none';
+  if(allPatients.length){ renderPatientTable(allPatients); return; }
+  await loadPatientsCache();
+  renderPatientTable(allPatients);
+}
+
+function renderPatientTable(pts){
+  const wrap=document.getElementById('pat-list-wrap');
+  if(!pts.length){ wrap.innerHTML=`<div class="empty"><div class="empty-icon">👤</div><div class="empty-title">No patients found</div><div class="empty-sub">Patients will appear here once added by a doctor</div></div>`; return; }
+  wrap.innerHTML=`<div class="tbl-wrap"><table>
+    <thead><tr><th>Patient</th><th>Phone</th><th>Email</th><th>Medical Aid</th></tr></thead>
+    <tbody>${pts.map(p=>`<tr class="tbl-clickable" onclick="viewPatient('${p.id}')">
+      <td><strong>${esc(p.first_name+' '+p.last_name)}</strong></td>
+      <td>${esc(p.phone||'—')}</td>
+      <td>${esc(p.email||'—')}</td>
+      <td>${p.medical_aid_provider?`<span class="pill pill-blue">${esc(p.medical_aid_provider)}</span>`:'<span class="pill pill-grey">Self-pay</span>'}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+function filterPatients(val){
+  if(!val){ renderPatientTable(allPatients); return; }
+  const q=val.toLowerCase();
+  renderPatientTable(allPatients.filter(p=>`${p.first_name} ${p.last_name} ${p.phone||''} ${p.email||''}`.toLowerCase().includes(q)));
+}
+
+function viewPatient(id){
+  const p=allPatients.find(x=>x.id===id); if(!p) return;
+  document.getElementById('pat-list-wrap').style.display='none';
+  document.getElementById('pat-detail').style.display='block';
+  const age=p.dob?Math.floor((Date.now()-new Date(p.dob))/(365.25*86400000)):null;
+  document.getElementById('pat-detail-inner').innerHTML=`
+    <div class="pat-detail-head">
+      <div class="pat-avatar-lg">${initials(p.first_name+' '+p.last_name)}</div>
+      <div>
+        <div class="pat-name-lg">${esc(p.first_name+' '+p.last_name)}</div>
+        <div class="pat-sub-lg">${age?age+' years old · ':''} ${p.id_number||'No ID on file'}</div>
+      </div>
+    </div>
+    <div class="section-title">Personal Information</div>
+    <div class="info-grid">
+      <div class="info-label">First Name</div><div class="info-value">${esc(p.first_name||'—')}</div>
+      <div class="info-label">Last Name</div><div class="info-value">${esc(p.last_name||'—')}</div>
+      <div class="info-label">Date of Birth</div><div class="info-value">${fmtDate(p.dob)}</div>
+      <div class="info-label">ID Number</div><div class="info-value">${esc(p.id_number||'—')}</div>
+      <div class="info-label">Phone</div><div class="info-value">${esc(p.phone||'—')}</div>
+      <div class="info-label">Email</div><div class="info-value">${esc(p.email||'—')}</div>
+      <div class="info-label">Address</div><div class="info-value">${esc(p.address||'—')}</div>
+    </div>
+    <div class="section-title">Medical Aid</div>
+    <div class="info-grid">
+      <div class="info-label">Provider</div><div class="info-value">${esc(p.medical_aid_provider||'—')}</div>
+      <div class="info-label">Member Number</div><div class="info-value">${esc(p.medical_aid_number||'—')}</div>
+      <div class="info-label">Plan</div><div class="info-value">${esc(p.medical_aid_plan||'—')}</div>
+      <div class="info-label">Principal Member</div><div class="info-value">${esc(p.medical_aid_principal||'—')}</div>
+    </div>`;
+}
+function backToPatients(){ document.getElementById('pat-list-wrap').style.display='block'; document.getElementById('pat-detail').style.display='none'; }
+
+/* ── DOCTORS ────────────────────────────────────────────────── */
+async function loadDoctors(){
+  document.getElementById('doc-list').style.display='block';
+  document.getElementById('doc-detail').style.display='none';
+  const today=isoToday();
+  const {data:appts}=await sb.from('appointments').select('doctor_id,status').eq('date',today);
+  const {data:avail}=await sb.from('doctor_availability').select('doctor_id,day_of_week,start_time,end_time,is_available');
+  renderDoctorList(R.doctors, appts||[], avail||[]);
+}
+
+function renderDoctorList(docs, appts, avail){
+  const wrap=document.getElementById('doc-list');
+  if(!docs.length){ wrap.innerHTML=`<div class="empty"><div class="empty-icon">🩺</div><div class="empty-title">No doctors found</div></div>`; return; }
+  const dow=new Date().getDay()||7;
+  wrap.innerHTML=docs.map(d=>{
+    const todayAppts=appts.filter(a=>a.doctor_id===d.id);
+    const inConsult=todayAppts.some(a=>a.status==='in_consultation');
+    const isAvail=avail.some(a=>a.doctor_id===d.id&&a.day_of_week===dow&&a.is_available!==false);
+    const status=inConsult?'in_consultation':isAvail?'available':'unavailable';
+    const statusLabel=status==='in_consultation'?'In Consultation':status==='available'?'Available':'Unavailable';
+    return `<div class="doctor-card" onclick="viewDoctor('${d.id}')">
+      <div class="doc-avatar">${initials(d.first_name+' '+d.last_name)}</div>
+      <div class="doc-info">
+        <div class="doc-name">Dr. ${esc(d.first_name)} ${esc(d.last_name)}</div>
+        <div class="doc-spec">${esc(d.specialization||'General Practitioner')}</div>
+      </div>
+      <div class="doc-stats">
+        <div class="doc-stat-item"><div class="doc-stat-val">${todayAppts.length}</div><div class="doc-stat-lbl">Today</div></div>
+        <div class="avail-badge avail-${status}">${statusLabel}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function viewDoctor(id){
+  const doc=R.doctors.find(d=>d.id===id); if(!doc) return;
+  document.getElementById('doc-list').style.display='none';
+  document.getElementById('doc-detail').style.display='block';
+  const {data:avail}=await sb.from('doctor_availability').select('*').eq('doctor_id',id);
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const schedHtml=`<div class="avail-week">${days.map((day,i)=>{
+    const dow=i+1;
+    const slot=(avail||[]).find(a=>a.day_of_week===dow);
+    return `<div class="avail-day-col">
+      <div class="avail-day-hd">${day}</div>
+      ${slot&&slot.is_available!==false
+        ?`<div class="avail-day-on">${fmtTime(slot.start_time||'08:00')} – ${fmtTime(slot.end_time||'17:00')}</div>`
+        :`<div class="avail-day-off">Off</div>`}
+    </div>`;
+  }).join('')}</div>`;
+  document.getElementById('doc-detail-inner').innerHTML=`
+    <div class="pat-detail-head" style="margin-bottom:24px">
+      <div class="doc-avatar" style="width:56px;height:56px;font-size:20px">${initials(doc.first_name+' '+doc.last_name)}</div>
+      <div>
+        <div class="pat-name-lg">Dr. ${esc(doc.first_name)} ${esc(doc.last_name)}</div>
+        <div class="pat-sub-lg">${esc(doc.specialization||'General Practitioner')}</div>
+      </div>
+    </div>
+    <div class="section-title">Weekly Availability Schedule</div>
+    ${schedHtml}`;
+}
+function backToDoctors(){ document.getElementById('doc-list').style.display='block'; document.getElementById('doc-detail').style.display='none'; }
+
+/* ── CLOSE DROPDOWN ON OUTSIDE CLICK ────────────────────────── */
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#bk-pat-search')&&!e.target.closest('#bk-pat-results'))
+    document.getElementById('bk-pat-results').classList.remove('open');
+});
+</script>
+</body>
+</html>
