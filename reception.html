@@ -315,7 +315,8 @@ tr:hover td{background:var(--grey-50)}
 
 <!-- LOGIN -->
 <div id="login-screen">
-  <div class="login-card">
+  <!-- STANDARD LOGIN CARD -->
+  <div class="login-card" id="login-card">
     <div class="login-badge">🏥 Reception Portal</div>
     <div class="login-logo">Med<span>Consult</span></div>
     <div class="login-sub">Sign in to your MedConsult Reception account</div>
@@ -323,6 +324,24 @@ tr:hover td{background:var(--grey-50)}
     <div class="lf"><label>Email Address</label><input type="email" id="l-email" placeholder="reception@practice.co.za" autocomplete="username"><span class="field-error" id="err-l-email"></span></div>
     <div class="lf"><label>Password</label><input type="password" id="l-pass" placeholder="Your password" autocomplete="current-password"><span class="field-error" id="err-l-pass"></span></div>
     <button class="login-btn" id="login-btn" onclick="doLogin()">Sign In →</button>
+  </div>
+
+  <!-- INVITE ACCEPTANCE CARD (shown when ?invite=TOKEN is in URL) -->
+  <div class="login-card" id="invite-card" style="display:none">
+    <div class="login-badge">🏥 Reception Portal</div>
+    <div class="login-logo">Med<span>Consult</span></div>
+    <div id="inv-practice-banner" style="background:rgba(43,127,255,.12);border:1px solid rgba(43,127,255,.3);border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:13px;color:#5b9fff;display:flex;align-items:center;gap:8px">
+      🏥 <span>You've been invited to join a practice</span>
+    </div>
+    <div class="login-sub" style="margin-bottom:20px">Create your reception account to get started</div>
+    <div id="inv-err" class="login-err"></div>
+    <div class="reg-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="lf"><label>First Name</label><input type="text" id="inv-fn" placeholder="Jane"><span class="field-error" id="err-inv-fn"></span></div>
+      <div class="lf"><label>Last Name</label><input type="text" id="inv-ln" placeholder="Smith"><span class="field-error" id="err-inv-ln"></span></div>
+    </div>
+    <div class="lf"><label>Email Address</label><input type="email" id="inv-email-disp" placeholder="" readonly style="opacity:.7"></div>
+    <div class="lf"><label>Create Password</label><input type="password" id="inv-pw" placeholder="Min 8 characters"><span class="field-error" id="err-inv-pw"></span></div>
+    <button class="login-btn" id="inv-accept-btn" onclick="acceptReceptionInvite()">Create Account &amp; Join Practice →</button>
   </div>
 </div>
 
@@ -656,10 +675,70 @@ async function doLogout(){
   toast('Signed out successfully','success');
 }
 
+/* ── INVITE TOKEN HANDLING (practice_invites) ────────────────── */
+let REC_INVITE_TOKEN=null,REC_INVITE_DATA=null;
+
+async function checkReceptionInvite(){
+  const token=new URLSearchParams(location.search).get('invite');
+  if(!token) return false;
+  const {data}=await sb.from('practice_invites')
+    .select('id,email,role,practice_id,practices(name),status,expires_at')
+    .eq('token',token).in('role',['receptionist','nurse','admin'])
+    .eq('status','pending').gt('expires_at',new Date().toISOString()).maybeSingle();
+  if(!data){toast('This invite link is invalid or has expired. Contact your practice owner.','error');return false;}
+  REC_INVITE_TOKEN=token;REC_INVITE_DATA=data;return true;
+}
+
+function showInviteCard(){
+  document.getElementById('login-card').style.display='none';
+  document.getElementById('invite-card').style.display='block';
+  document.getElementById('inv-email-disp').value=REC_INVITE_DATA.email;
+  const banner=document.getElementById('inv-practice-banner');
+  banner.innerHTML=`🏥 <span>You've been invited to join <strong>${esc(REC_INVITE_DATA.practices?.name||'a practice')}</strong> as <strong>${capitalise(REC_INVITE_DATA.role)}</strong></span>`;
+}
+
+async function acceptReceptionInvite(){
+  const fn=document.getElementById('inv-fn').value.trim();
+  const ln=document.getElementById('inv-ln').value.trim();
+  const pw=document.getElementById('inv-pw').value;
+  const errEl=document.getElementById('inv-err');
+  errEl.style.display='none';
+  ['inv-fn','inv-ln','inv-pw'].forEach(id=>{
+    document.getElementById('err-'+id).textContent='';
+  });
+  let ok=true;
+  if(!fn){document.getElementById('err-inv-fn').textContent='First name required';ok=false;}
+  if(!ln){document.getElementById('err-inv-ln').textContent='Last name required';ok=false;}
+  if(!pw||pw.length<8){document.getElementById('err-inv-pw').textContent='Password must be at least 8 characters';ok=false;}
+  if(!ok) return;
+  const btn=document.getElementById('inv-accept-btn');
+  btn.disabled=true;btn.textContent='Creating account…';
+  const {data,error}=await sb.auth.signUp({
+    email:REC_INVITE_DATA.email,password:pw,
+    options:{data:{fn,ln,name:`${fn} ${ln}`,role:REC_INVITE_DATA.role}}
+  });
+  if(error){errEl.style.display='block';errEl.textContent=error.message;btn.disabled=false;btn.textContent='Create Account & Join Practice →';return;}
+  const user=data.user;
+  await sb.from('practice_members').insert({
+    auth_id:user.id,practice_id:REC_INVITE_DATA.practice_id,
+    role:REC_INVITE_DATA.role,status:'active',email:REC_INVITE_DATA.email
+  });
+  await sb.from('practice_invites').update({status:'accepted'}).eq('token',REC_INVITE_TOKEN);
+  toast(`Welcome to ${REC_INVITE_DATA.practices?.name||'the practice'}!`,'success');
+  if(!data.session){
+    const {data:sd}=await sb.auth.signInWithPassword({email:REC_INVITE_DATA.email,password:pw});
+    if(sd?.user) await verifyAndLaunch(sd.user);
+  } else {
+    await verifyAndLaunch(user);
+  }
+}
+
 /* ── BOOT ───────────────────────────────────────────────────── */
 (async()=>{
+  const hasInvite=await checkReceptionInvite();
   const {data:{session}}=await sb.auth.getSession();
   if(session){ await verifyAndLaunch(session.user); }
+  else if(hasInvite){ showLogin(); showInviteCard(); }
   else{ showLogin(); }
 })();
 

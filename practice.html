@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MedConsult — Practice Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ── TOKENS ──────────────────────────────────────────────── */
+:root {
+  --black:#0a0a0b; --grey-900:#111113; --grey-800:#1c1c1f; --grey-700:#2a2a2f;
+  --grey-600:#3d3d45; --grey-500:#5a5a65; --grey-400:#7f7f8e; --grey-300:#a8a8b8;
+  --grey-200:#d0d0da; --grey-100:#e8e8ef; --grey-50:#f4f4f7; --white:#fff;
+  --azure:#2b7fff; --azure-light:#5b9fff; --azure-dark:#1a5fcc;
+  --azure-dim:rgba(43,127,255,.12); --azure-glow:rgba(43,127,255,.25);
+  --bg:#f4f4f7; --surface:#fff; --border:#d0d0da;
+  --ink:#111113; --ink2:#5a5a65; --ink3:#a8a8b8;
+  --success:#16a34a; --success-bg:#f0fdf4;
+  --warning:#d97706; --warning-bg:#fffbeb;
+  --danger:#dc2626; --danger-bg:#fef2f2;
+  --shadow-sm:0 1px 3px rgba(0,0,0,.08); --shadow-md:0 4px 12px rgba(0,0,0,.1);
+  --shadow-lg:0 12px 32px rgba(0,0,0,.14); --radius:12px; --radius-sm:8px;
+  --sidebar-w:260px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'Sora',sans-serif;font-size:14px;color:var(--ink);background:var(--bg);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;outline:none}
+input,select,textarea{font-family:inherit;outline:none}
+
+/* ── LOADING ─────────────────────────────────────────────── */
+#loading-screen{position:fixed;inset:0;background:var(--black);display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px}
+.load-logo{font-family:'Playfair Display',serif;font-size:28px;color:var(--white);letter-spacing:-.5px}
+.load-logo span{color:var(--azure)}
+.load-spin{width:32px;height:32px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--azure);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── REGISTRATION SCREEN ──────────────────────────────────── */
+#reg-screen{display:none;min-height:100vh;background:var(--black)}
+.reg-layout{display:grid;grid-template-columns:420px 1fr;min-height:100vh}
+
+/* LEFT PANEL */
+.reg-left{background:var(--grey-900);border-right:1px solid var(--grey-700);padding:48px 40px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.reg-logo{font-family:'Playfair Display',serif;font-size:26px;color:var(--white);margin-bottom:4px}
+.reg-logo span{color:var(--azure)}
+.reg-tagline{font-size:13px;color:var(--grey-400);margin-bottom:40px}
+.price-block{background:var(--grey-800);border:1px solid var(--grey-700);border-radius:var(--radius);padding:24px;margin-bottom:32px}
+.price-plan{font-size:11px;font-weight:700;color:var(--azure);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.price-amount{font-family:'JetBrains Mono',monospace;font-size:38px;font-weight:700;color:var(--white);line-height:1}
+.price-amount span{font-size:16px;color:var(--grey-400);font-family:'Sora',sans-serif;font-weight:400}
+.price-trial{font-size:12px;color:var(--success);margin-top:8px;display:flex;align-items:center;gap:6px}
+.benefit-list{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:40px}
+.benefit-list li{display:flex;align-items:flex-start;gap:10px;font-size:13px;color:var(--grey-300)}
+.benefit-list li .bi{color:var(--azure);font-size:14px;flex-shrink:0;margin-top:1px}
+.trust-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding-top:24px;border-top:1px solid var(--grey-800)}
+.trust-badge{background:var(--grey-800);border:1px solid var(--grey-700);border-radius:var(--radius-sm);padding:6px 12px;font-size:11px;color:var(--grey-400)}
+
+/* RIGHT PANEL */
+.reg-right{padding:48px 56px;overflow-y:auto;display:flex;flex-direction:column}
+.reg-right-inner{max-width:560px;width:100%}
+
+/* STEP INDICATOR */
+.step-indicator{display:flex;align-items:center;margin-bottom:36px}
+.step-node{display:flex;align-items:center;gap:8px}
+.step-circle{width:32px;height:32px;border-radius:50%;border:2px solid var(--grey-700);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--grey-500);transition:.25s;flex-shrink:0;background:var(--grey-800)}
+.step-circle.active{border-color:var(--azure);background:var(--azure);color:var(--white)}
+.step-circle.done{border-color:var(--success);background:var(--success);color:var(--white)}
+.step-label{font-size:11px;color:var(--grey-500);font-weight:600;white-space:nowrap}
+.step-label.active{color:var(--white)}
+.step-label.done{color:var(--success)}
+.step-line{flex:1;height:1px;background:var(--grey-700);margin:0 8px;min-width:16px}
+
+/* FORM */
+.step-panel{display:none}
+.step-panel.active{display:block}
+.step-heading{font-family:'Playfair Display',serif;font-size:24px;color:var(--white);margin-bottom:4px}
+.step-sub{font-size:13px;color:var(--grey-400);margin-bottom:28px}
+.reg-field{margin-bottom:18px}
+.reg-field label{display:block;font-size:11px;font-weight:700;color:var(--grey-300);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}
+.reg-field label .opt{font-weight:400;color:var(--grey-500);text-transform:none;letter-spacing:0}
+.reg-field input,.reg-field select,.reg-field textarea{width:100%;background:var(--grey-800);border:1px solid var(--grey-700);border-radius:var(--radius-sm);padding:12px 14px;color:var(--white);font-size:14px;transition:.2s}
+.reg-field input:focus,.reg-field select:focus,.reg-field textarea:focus{border-color:var(--azure);box-shadow:0 0 0 3px var(--azure-dim)}
+.reg-field input::placeholder,.reg-field textarea::placeholder{color:var(--grey-500)}
+.reg-field select{cursor:pointer}
+.reg-field select option{background:var(--grey-800);color:var(--white)}
+.reg-field .field-error{display:block;font-size:11px;color:var(--danger);margin-top:5px}
+.reg-field input.invalid{border-color:var(--danger)!important}
+.reg-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.step-actions{display:flex;gap:12px;margin-top:28px}
+.reg-btn{padding:13px 24px;border-radius:var(--radius-sm);font-size:14px;font-weight:600;transition:.15s}
+.reg-btn-primary{background:var(--azure);color:var(--white);flex:1}
+.reg-btn-primary:hover{background:var(--azure-dark)}
+.reg-btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.reg-btn-secondary{background:var(--grey-700);color:var(--grey-200)}
+.reg-btn-secondary:hover{background:var(--grey-600)}
+
+/* TEAM MEMBER ROW */
+.team-member-row{display:grid;grid-template-columns:1fr 160px 36px;gap:10px;align-items:start;margin-bottom:12px;background:var(--grey-800);border:1px solid var(--grey-700);border-radius:var(--radius-sm);padding:12px}
+.team-member-row input,.team-member-row select{background:var(--grey-700);border-color:var(--grey-600);padding:9px 10px;font-size:13px}
+.add-member-btn{background:transparent;border:1px dashed var(--grey-600);border-radius:var(--radius-sm);padding:10px 16px;color:var(--grey-400);font-size:13px;font-weight:500;width:100%;margin-top:4px;transition:.15s}
+.add-member-btn:hover{border-color:var(--azure);color:var(--azure)}
+.remove-member-btn{background:var(--grey-700);border:1px solid var(--grey-600);border-radius:6px;width:36px;height:36px;color:var(--grey-400);font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:24px;transition:.15s}
+.remove-member-btn:hover{background:var(--danger-bg);border-color:var(--danger);color:var(--danger)}
+
+/* BILLING */
+.plan-summary-card{background:var(--grey-800);border:1px solid var(--azure-glow);border-radius:var(--radius);padding:24px;margin-bottom:24px}
+.plan-name{font-size:11px;font-weight:700;color:var(--azure);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+.plan-price{font-family:'JetBrains Mono',monospace;font-size:30px;font-weight:700;color:var(--white)}
+.plan-price span{font-size:14px;color:var(--grey-400);font-family:'Sora',sans-serif;font-weight:400}
+.plan-includes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:14px}
+.plan-inc-item{font-size:12px;color:var(--grey-300);display:flex;align-items:center;gap:6px}
+.payfast-note{background:var(--grey-800);border:1px solid var(--grey-700);border-radius:var(--radius-sm);padding:12px 14px;font-size:12px;color:var(--grey-400);display:flex;align-items:center;gap:8px;margin-bottom:20px}
+
+/* EMAIL VERIFY SCREEN */
+#verify-screen{display:none;position:fixed;inset:0;background:var(--black);align-items:center;justify-content:center;padding:24px}
+.verify-card{background:var(--grey-900);border:1px solid var(--grey-700);border-radius:var(--radius);padding:48px;text-align:center;max-width:440px}
+.verify-icon{font-size:48px;margin-bottom:16px}
+.verify-title{font-family:'Playfair Display',serif;font-size:24px;color:var(--white);margin-bottom:8px}
+.verify-sub{font-size:13px;color:var(--grey-400);line-height:1.7;margin-bottom:24px}
+.verify-email-pill{background:var(--azure-dim);border:1px solid var(--azure-glow);border-radius:20px;padding:6px 16px;font-size:13px;color:var(--azure);display:inline-block;margin-bottom:24px}
+
+/* ACCESS DENIED */
+#denied-screen{display:none;position:fixed;inset:0;background:var(--black);align-items:center;justify-content:center;padding:24px}
+.denied-card{background:var(--grey-900);border:1px solid var(--danger);border-radius:var(--radius);padding:48px;text-align:center;max-width:420px}
+.denied-icon{font-size:48px;margin-bottom:16px}
+.denied-title{font-family:'Playfair Display',serif;font-size:24px;color:var(--white);margin-bottom:8px}
+.denied-sub{font-size:13px;color:var(--grey-400);margin-bottom:24px;line-height:1.7}
+
+/* ── DASHBOARD ────────────────────────────────────────────── */
+#app{display:none;height:100%;flex-direction:row}
+.sidebar{width:var(--sidebar-w);background:var(--black);display:flex;flex-direction:column;flex-shrink:0;height:100vh;position:sticky;top:0;overflow-y:auto}
+.sb-head{padding:24px 20px 18px}
+.sb-practice-label{font-size:11px;font-weight:600;color:var(--grey-500);letter-spacing:.5px;text-transform:uppercase;margin-bottom:3px}
+.sb-practice-name{font-size:15px;font-weight:700;color:var(--white);line-height:1.3;margin-bottom:8px}
+.sb-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(43,127,255,.15);border:1px solid rgba(43,127,255,.3);border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700;color:var(--azure);letter-spacing:.8px;text-transform:uppercase}
+.sb-divider{height:1px;background:var(--grey-800);margin:0 20px}
+.sb-nav{padding:12px;flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);color:var(--grey-400);font-size:13px;font-weight:500;cursor:pointer;transition:.15s;margin-bottom:2px;user-select:none}
+.nav-item:hover{background:var(--grey-800);color:var(--white)}
+.nav-item.active{background:var(--azure-dim);color:var(--azure);font-weight:600}
+.nav-icon{font-size:16px;width:20px;text-align:center}
+.sb-footer{padding:16px 20px;border-top:1px solid var(--grey-800)}
+.sb-user{display:flex;align-items:center;gap:10px}
+.sb-avatar{width:34px;height:34px;border-radius:50%;background:var(--azure-dim);border:1px solid var(--azure-glow);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--azure);flex-shrink:0}
+.sb-uname{font-size:13px;font-weight:600;color:var(--white);line-height:1.2}
+.sb-urole{font-size:11px;color:var(--grey-500)}
+.sb-logout{margin-left:auto;background:transparent;color:var(--grey-500);font-size:18px;padding:4px;border-radius:4px;transition:.15s}
+.sb-logout:hover{color:var(--danger)}
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{background:var(--white);border-bottom:1px solid var(--border);padding:0 28px;height:60px;display:flex;align-items:center;gap:16px;flex-shrink:0;position:sticky;top:0;z-index:100}
+.topbar-hamburger{display:none;background:none;font-size:20px;color:var(--ink);padding:6px;border-radius:6px}
+.topbar-hamburger:hover{background:var(--grey-50)}
+.topbar-title{font-weight:700;font-size:16px;color:var(--ink);flex:1}
+.topbar-clock{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:var(--ink2);background:var(--grey-50);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 12px}
+.page-wrap{flex:1;overflow-y:auto;padding:28px}
+.page{display:none}
+.page.active{display:block}
+.page-header{margin-bottom:24px}
+.page-header h1{font-family:'Playfair Display',serif;font-size:26px;color:var(--ink);margin-bottom:4px}
+.page-header p{font-size:13px;color:var(--ink2)}
+
+/* COMPONENTS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-sm)}
+.card-title{font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-sm)}
+.stat-label{font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.stat-value{font-size:32px;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace;line-height:1}
+.stat-sub{font-size:12px;color:var(--ink3);margin-top:4px}
+.tbl-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;background:var(--surface)}
+th{font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.5px;padding:12px 16px;text-align:left;background:var(--grey-50);border-bottom:1px solid var(--border)}
+td{padding:12px 16px;border-bottom:1px solid var(--grey-100);font-size:13px;color:var(--ink)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--grey-50)}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.3px}
+.pill-blue{background:var(--azure-dim);color:var(--azure)}
+.pill-green{background:var(--success-bg);color:var(--success)}
+.pill-yellow{background:var(--warning-bg);color:var(--warning)}
+.pill-red{background:var(--danger-bg);color:var(--danger)}
+.pill-grey{background:var(--grey-100);color:var(--grey-500)}
+.pill-purple{background:#f3e8ff;color:#7c3aed}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;transition:.15s;cursor:pointer;border:none}
+.btn-primary{background:var(--azure);color:var(--white)}
+.btn-primary:hover{background:var(--azure-dark)}
+.btn-secondary{background:var(--grey-50);color:var(--ink);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--grey-100)}
+.btn-danger{background:var(--danger-bg);color:var(--danger);border:1px solid rgba(220,38,38,.2)}
+.btn-danger:hover{background:var(--danger);color:var(--white)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.skel{background:linear-gradient(90deg,var(--grey-100) 25%,var(--grey-50) 50%,var(--grey-100) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:6px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.skel-row{height:44px;margin-bottom:8px}
+.skel-stat{height:88px;border-radius:var(--radius)}
+.empty{text-align:center;padding:48px 24px}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+.empty-title{font-weight:600;font-size:15px;color:var(--ink);margin-bottom:6px}
+.empty-sub{font-size:13px;color:var(--ink2)}
+.form-field{margin-bottom:16px}
+.form-field label{display:block;font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px}
+.form-field input,.form-field select,.form-field textarea{width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;color:var(--ink);background:var(--surface);transition:.2s}
+.form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--azure);box-shadow:0 0 0 3px var(--azure-dim)}
+.form-field textarea{resize:vertical;min-height:80px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow-lg);width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal-head{padding:20px 24px 0;display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.modal-head h2{font-family:'Playfair Display',serif;font-size:20px}
+.modal-close{background:var(--grey-50);border:1px solid var(--border);width:32px;height:32px;border-radius:50%;font-size:18px;color:var(--ink2);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.modal-close:hover{background:var(--grey-100)}
+.modal-body{padding:0 24px 24px}
+.modal-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+.field-error{display:block;font-size:11px;color:var(--danger);margin-top:4px}
+.input-invalid{border-color:var(--danger)!important}
+.invite-url-box{background:var(--grey-50);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink2);word-break:break-all;margin-bottom:8px}
+.section-divider{font-size:13px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:8px;margin:28px 0 16px}
+.section-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+#toast-rack{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:var(--grey-900);color:var(--white);border-radius:var(--radius-sm);padding:12px 16px;font-size:13px;font-weight:500;box-shadow:var(--shadow-lg);animation:toastIn .25s ease;display:flex;align-items:center;gap:8px;pointer-events:all;max-width:320px;border-left:3px solid var(--azure)}
+.toast.success{border-left-color:var(--success)}
+.toast.error{border-left-color:var(--danger)}
+.toast.warning{border-left-color:var(--warning)}
+@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+/* OVERVIEW */
+.trial-banner{background:linear-gradient(135deg,rgba(43,127,255,.1),rgba(43,127,255,.05));border:1px solid var(--azure-glow);border-radius:var(--radius);padding:20px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
+.trial-text{font-size:15px;font-weight:600;color:var(--azure)}
+.trial-sub{font-size:12px;color:var(--ink2);margin-top:2px}
+.doctor-list-item{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid var(--grey-100);transition:.15s}
+.doctor-list-item:last-child{border-bottom:none}
+.doctor-list-item:hover{background:var(--grey-50)}
+.doc-avatar-sm{width:36px;height:36px;border-radius:50%;background:var(--azure-dim);border:1px solid var(--azure-glow);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--azure);flex-shrink:0}
+
+/* TEAM */
+.member-actions{display:flex;gap:6px;flex-wrap:wrap}
+.pending-invite-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--grey-100);flex-wrap:wrap}
+.pending-invite-row:last-child{border-bottom:none}
+
+/* BILLING */
+.plan-card-dash{background:linear-gradient(135deg,var(--azure),var(--azure-dark));border-radius:var(--radius);padding:28px;color:var(--white);margin-bottom:20px}
+.plan-card-name{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.8;margin-bottom:8px}
+.plan-card-price{font-family:'JetBrains Mono',monospace;font-size:40px;font-weight:700;line-height:1}
+.plan-card-price span{font-size:16px;font-weight:400;opacity:.7;font-family:'Sora',sans-serif}
+.plan-card-status{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.2);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;margin-top:12px}
+.billing-info-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--grey-100);font-size:13px}
+.billing-info-row:last-child{border-bottom:none}
+.billing-info-label{color:var(--ink2)}
+.billing-info-value{font-weight:600;color:var(--ink)}
+.includes-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.includes-item{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2)}
+.includes-item .ic{color:var(--success)}
+
+/* SIDEBAR OVERLAY */
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199}
+.sb-overlay.open{display:block}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .reg-layout{grid-template-columns:1fr}
+  .reg-left{display:none}
+  .reg-right{padding:32px 24px}
+}
+@media(max-width:768px){
+  .sidebar{position:fixed;left:-280px;top:0;bottom:0;z-index:200;transition:left .25s ease;height:100%}
+  .sidebar.open{left:0}
+  .topbar-hamburger{display:flex}
+  .page-wrap{padding:16px}
+  .stat-row{grid-template-columns:1fr 1fr}
+  .form-row{grid-template-columns:1fr}
+  .reg-row{grid-template-columns:1fr}
+  .plan-includes{grid-template-columns:1fr}
+  .includes-grid{grid-template-columns:1fr}
+  .trial-banner{flex-direction:column;align-items:flex-start}
+  .member-actions{gap:4px}
+}
+@media(max-width:420px){
+  .stat-row{grid-template-columns:1fr}
+  .team-member-row{grid-template-columns:1fr;gap:8px}
+  .remove-member-btn{margin-top:0;width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="load-logo">Med<span>Consult</span></div>
+  <div class="load-spin"></div>
+</div>
+
+<!-- REGISTRATION -->
+<div id="reg-screen">
+  <div class="reg-layout">
+    <!-- LEFT: Benefits -->
+    <div class="reg-left">
+      <div class="reg-logo">Med<span>Consult</span></div>
+      <div class="reg-tagline">The complete platform for modern medical practices</div>
+      <div class="price-block">
+        <div class="price-plan">Practice Plan</div>
+        <div class="price-amount">R 5,000<span> / month</span></div>
+        <div class="price-trial">✅ 30-day free trial — no charge today</div>
+      </div>
+      <ul class="benefit-list">
+        <li><span class="bi">🩺</span><span><strong>Unlimited doctors</strong> — add your entire clinical team</span></li>
+        <li><span class="bi">👥</span><span><strong>Unlimited patients</strong> — no per-patient fees ever</span></li>
+        <li><span class="bi">🏥</span><span><strong>Reception accounts</strong> — front-desk booking and check-in portal</span></li>
+        <li><span class="bi">📅</span><span><strong>Shared calendar</strong> — practice-wide availability and scheduling</span></li>
+        <li><span class="bi">📊</span><span><strong>Practice reporting</strong> — revenue, appointments and patient analytics</span></li>
+        <li><span class="bi">📄</span><span><strong>Digital sick notes &amp; prescriptions</strong> — signed and date-stamped</span></li>
+        <li><span class="bi">⭐</span><span><strong>Priority support</strong> — dedicated practice success manager</span></li>
+        <li><span class="bi">🔒</span><span><strong>POPIA compliant</strong> — encrypted patient data, SA data residency</span></li>
+      </ul>
+      <div class="trust-badges">
+        <div class="trust-badge">🏥 HPCSA Aligned</div>
+        <div class="trust-badge">🔒 POPIA Compliant</div>
+        <div class="trust-badge">🇿🇦 South African</div>
+        <div class="trust-badge">💳 PayFast Payments</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Form -->
+    <div class="reg-right" style="background:var(--grey-800)">
+      <div class="reg-right-inner">
+        <!-- Step indicator -->
+        <div class="step-indicator" id="step-indicator">
+          <div class="step-node">
+            <div class="step-circle active" id="sc-1">1</div>
+            <div class="step-label active" id="sl-1">Practice</div>
+          </div>
+          <div class="step-line"></div>
+          <div class="step-node">
+            <div class="step-circle" id="sc-2">2</div>
+            <div class="step-label" id="sl-2">Owner</div>
+          </div>
+          <div class="step-line"></div>
+          <div class="step-node">
+            <div class="step-circle" id="sc-3">3</div>
+            <div class="step-label" id="sl-3">Team</div>
+          </div>
+          <div class="step-line"></div>
+          <div class="step-node">
+            <div class="step-circle" id="sc-4">4</div>
+            <div class="step-label" id="sl-4">Billing</div>
+          </div>
+        </div>
+
+        <!-- STEP 1: Practice Details -->
+        <div class="step-panel active" id="step-1">
+          <div class="step-heading">Your Practice Details</div>
+          <div class="step-sub">Tell us about the medical practice you're registering</div>
+          <div class="reg-field"><label>Practice Name <span style="color:var(--danger)">*</span></label><input type="text" id="s1-name" placeholder="Roberts Family Practice"><span class="field-error" id="e-s1-name"></span></div>
+          <div class="reg-field"><label>Physical Address <span style="color:var(--danger)">*</span></label><input type="text" id="s1-addr" placeholder="123 Medical Centre, Sandton, 2196"><span class="field-error" id="e-s1-addr"></span></div>
+          <div class="reg-row">
+            <div class="reg-field"><label>Practice Phone <span style="color:var(--danger)">*</span></label><input type="tel" id="s1-phone" placeholder="+27 11 123 4567"><span class="field-error" id="e-s1-phone"></span></div>
+            <div class="reg-field"><label>Practice Email <span style="color:var(--danger)">*</span></label><input type="email" id="s1-email" placeholder="info@yourpractice.co.za"><span class="field-error" id="e-s1-email"></span></div>
+          </div>
+          <div class="reg-row">
+            <div class="reg-field"><label>HPCSA Practice Number <span style="color:var(--danger)">*</span></label><input type="text" id="s1-hpcsa" placeholder="PR0123456"><span class="field-error" id="e-s1-hpcsa"></span></div>
+            <div class="reg-field"><label>VAT Number <span class="opt">(optional)</span></label><input type="text" id="s1-vat" placeholder="4123456789"></div>
+          </div>
+          <div class="step-actions">
+            <button class="reg-btn reg-btn-primary" onclick="goStep(2)">Next: Owner Account →</button>
+          </div>
+        </div>
+
+        <!-- STEP 2: Owner / Lead Doctor -->
+        <div class="step-panel" id="step-2">
+          <div class="step-heading">Owner / Lead Doctor Account</div>
+          <div class="step-sub">This creates your login and your doctor profile on the platform</div>
+          <div class="reg-row">
+            <div class="reg-field"><label>First Name <span style="color:var(--danger)">*</span></label><input type="text" id="s2-fn" placeholder="Jane"><span class="field-error" id="e-s2-fn"></span></div>
+            <div class="reg-field"><label>Last Name <span style="color:var(--danger)">*</span></label><input type="text" id="s2-ln" placeholder="Roberts"><span class="field-error" id="e-s2-ln"></span></div>
+          </div>
+          <div class="reg-field"><label>Email Address <span style="color:var(--danger)">*</span></label><input type="email" id="s2-email" placeholder="dr@yourpractice.co.za"><span class="field-error" id="e-s2-email"></span></div>
+          <div class="reg-field"><label>Password <span style="color:var(--danger)">*</span></label><input type="password" id="s2-pw" placeholder="Min 8 characters"><span class="field-error" id="e-s2-pw"></span></div>
+          <div class="reg-row">
+            <div class="reg-field"><label>Specialisation <span style="color:var(--danger)">*</span></label>
+              <select id="s2-spec">
+                <option value="">Select…</option>
+                <option>General Practitioner</option>
+                <option>Cardiologist</option>
+                <option>Dermatologist</option>
+                <option>Endocrinologist</option>
+                <option>Gastroenterologist</option>
+                <option>Gynaecologist</option>
+                <option>Neurologist</option>
+                <option>Oncologist</option>
+                <option>Orthopaedic Surgeon</option>
+                <option>Paediatrician</option>
+                <option>Psychiatrist</option>
+                <option>Pulmonologist</option>
+                <option>Radiologist</option>
+                <option>Rheumatologist</option>
+                <option>Urologist</option>
+              </select>
+              <span class="field-error" id="e-s2-spec"></span>
+            </div>
+            <div class="reg-field"><label>Personal HPCSA Number <span style="color:var(--danger)">*</span></label><input type="text" id="s2-hpcsa" placeholder="MP0123456"><span class="field-error" id="e-s2-hpcsa"></span></div>
+          </div>
+          <div class="reg-field"><label>Digital Signature Name <span style="color:var(--danger)">*</span></label><input type="text" id="s2-sig" placeholder="Dr. J. Roberts (as it should appear on documents)"><span class="field-error" id="e-s2-sig"></span></div>
+          <div class="step-actions">
+            <button class="reg-btn reg-btn-secondary" onclick="goStep(1)">← Back</button>
+            <button class="reg-btn reg-btn-primary" onclick="goStep(3)">Next: Team Setup →</button>
+          </div>
+        </div>
+
+        <!-- STEP 3: Team Setup -->
+        <div class="step-panel" id="step-3">
+          <div class="step-heading">Team Setup</div>
+          <div class="step-sub">Add team members now or skip — you can invite people later from the dashboard</div>
+          <div id="team-rows"></div>
+          <button class="add-member-btn" onclick="addTeamRow()">+ Add another team member</button>
+          <div style="background:var(--grey-700);border-radius:var(--radius-sm);padding:12px 14px;margin-top:16px;font-size:12px;color:var(--grey-400);display:flex;align-items:flex-start;gap:8px">
+            <span style="flex-shrink:0">📧</span>
+            <span>Each team member will receive an email invite with a unique link to create their account and join this practice.</span>
+          </div>
+          <div class="step-actions">
+            <button class="reg-btn reg-btn-secondary" onclick="goStep(2)">← Back</button>
+            <button class="reg-btn reg-btn-primary" onclick="goStep(4)">Next: Billing →</button>
+          </div>
+        </div>
+
+        <!-- STEP 4: Billing -->
+        <div class="step-panel" id="step-4">
+          <div class="step-heading">Start Your Free Trial</div>
+          <div class="step-sub">30 days free — your card will only be charged after the trial ends</div>
+          <div class="plan-summary-card">
+            <div class="plan-name">Practice Plan</div>
+            <div class="plan-price">R 5,000<span> / month after trial</span></div>
+            <div class="plan-includes">
+              <div class="plan-inc-item">✅ Unlimited doctors</div>
+              <div class="plan-inc-item">✅ Unlimited patients</div>
+              <div class="plan-inc-item">✅ Reception accounts</div>
+              <div class="plan-inc-item">✅ Shared calendar</div>
+              <div class="plan-inc-item">✅ Practice reporting</div>
+              <div class="plan-inc-item">✅ Priority support</div>
+              <div class="plan-inc-item">✅ Digital sick notes</div>
+              <div class="plan-inc-item">✅ 30-day free trial</div>
+            </div>
+          </div>
+          <div class="reg-field"><label>Card Number <span style="color:var(--danger)">*</span></label><input type="text" id="s4-card" placeholder="4242 4242 4242 4242" maxlength="19" oninput="fmtCard(this)"><span class="field-error" id="e-s4-card"></span></div>
+          <div class="reg-row">
+            <div class="reg-field"><label>Expiry (MM / YY) <span style="color:var(--danger)">*</span></label><input type="text" id="s4-exp" placeholder="MM / YY" maxlength="7" oninput="fmtExp(this)"><span class="field-error" id="e-s4-exp"></span></div>
+            <div class="reg-field"><label>CVV <span style="color:var(--danger)">*</span></label><input type="text" id="s4-cvv" placeholder="123" maxlength="4"><span class="field-error" id="e-s4-cvv"></span></div>
+          </div>
+          <div class="reg-field"><label>Name on Card <span style="color:var(--danger)">*</span></label><input type="text" id="s4-cname" placeholder="DR JANE ROBERTS"><span class="field-error" id="e-s4-cname"></span></div>
+          <div class="payfast-note">🔒 <span>Payments processed securely via <strong>PayFast</strong>. Your card details are encrypted and never stored on our servers.</span></div>
+          <div class="step-actions">
+            <button class="reg-btn reg-btn-secondary" onclick="goStep(3)">← Back</button>
+            <button class="reg-btn reg-btn-primary" id="launch-btn" onclick="launchTrial()">🚀 Start 30-Day Free Trial</button>
+          </div>
+          <div id="reg-error" style="margin-top:12px;background:var(--danger-bg);border:1px solid var(--danger);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--danger);display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EMAIL VERIFY SCREEN -->
+<div id="verify-screen">
+  <div class="verify-card">
+    <div class="verify-icon">📬</div>
+    <div class="verify-title">Check your email</div>
+    <div class="verify-sub">We've sent a verification link to:</div>
+    <div class="verify-email-pill" id="verify-email"></div>
+    <div class="verify-sub">Click the link in that email to verify your account and complete your practice setup. Once verified, return to this page and sign in.</div>
+    <button class="btn btn-primary" onclick="showLogin()">Sign In After Verifying →</button>
+  </div>
+</div>
+
+<!-- ACCESS DENIED -->
+<div id="denied-screen">
+  <div class="denied-card">
+    <div class="denied-icon">🚫</div>
+    <div class="denied-title">Access Denied</div>
+    <div class="denied-sub" id="denied-msg">This portal is for practice owners and administrators only.</div>
+    <button class="btn btn-danger" onclick="doLogout()">Sign Out</button>
+  </div>
+</div>
+
+<!-- LOGIN MODAL (for returning owners) -->
+<div class="modal-overlay" id="modal-login">
+  <div class="modal" style="max-width:420px;background:var(--grey-900);border:1px solid var(--grey-700)">
+    <div class="modal-head" style="border-bottom:none">
+      <h2 style="color:var(--white)">Sign In to Your Practice</h2>
+      <button class="modal-close" onclick="closeLogin()" style="background:var(--grey-800);border-color:var(--grey-600);color:var(--grey-300)">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--danger-bg);border:1px solid var(--danger);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--danger);margin-bottom:16px;display:none" id="login-modal-err"></div>
+      <div class="form-field" style="margin-bottom:14px">
+        <label style="color:var(--grey-300)">Email</label>
+        <input type="email" id="lm-email" placeholder="owner@practice.co.za" style="background:var(--grey-800);border-color:var(--grey-700);color:var(--white)">
+        <input type="password" id="lm-pass" placeholder="Password" style="background:var(--grey-800);border-color:var(--grey-700);color:var(--white);margin-top:10px">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:13px" id="lm-btn" onclick="doModalLogin()">Sign In →</button>
+      <div style="text-align:center;margin-top:16px;font-size:12px;color:var(--grey-500)">Don't have an account? <a href="#" onclick="closeLogin()" style="color:var(--azure)">Register your practice</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP: PRACTICE DASHBOARD -->
+<div id="app">
+  <div class="sidebar" id="sidebar">
+    <div class="sb-head">
+      <div class="sb-practice-label">Practice</div>
+      <div class="sb-practice-name" id="sb-practice-name">Loading…</div>
+      <div class="sb-badge">👑 Owner Portal</div>
+    </div>
+    <div class="sb-divider"></div>
+    <nav class="sb-nav">
+      <div class="nav-item active" onclick="nav('overview',this)" id="ni-overview"><span class="nav-icon">📊</span> Overview</div>
+      <div class="nav-item" onclick="nav('team',this)" id="ni-team"><span class="nav-icon">👥</span> Team Management</div>
+      <div class="nav-item" onclick="nav('billing',this)" id="ni-billing"><span class="nav-icon">💳</span> Billing</div>
+      <div class="nav-item" onclick="nav('settings',this)" id="ni-settings"><span class="nav-icon">⚙️</span> Settings</div>
+    </nav>
+    <div class="sb-footer">
+      <div class="sb-user">
+        <div class="sb-avatar" id="sb-avatar">O</div>
+        <div>
+          <div class="sb-uname" id="sb-uname">Owner</div>
+          <div class="sb-urole">Practice Owner</div>
+        </div>
+        <button class="sb-logout" onclick="doLogout()" title="Log out">↩</button>
+      </div>
+    </div>
+  </div>
+  <div class="sb-overlay" id="sb-overlay" onclick="closeSidebar()"></div>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="topbar-hamburger" onclick="openSidebar()">☰</button>
+      <div class="topbar-title" id="topbar-title">Overview</div>
+      <div class="topbar-clock" id="topbar-clock">--:--</div>
+    </div>
+    <div class="page-wrap">
+
+      <!-- OVERVIEW -->
+      <div class="page active" id="pg-overview">
+        <div id="trial-banner-wrap"></div>
+        <div class="stat-row" id="dash-stats">
+          <div class="skel skel-stat"></div><div class="skel skel-stat"></div>
+          <div class="skel skel-stat"></div><div class="skel skel-stat"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Doctors in Practice — Today's Appointments</div>
+          <div id="doc-list-overview"><div class="skel skel-row"></div><div class="skel skel-row"></div></div>
+        </div>
+      </div>
+
+      <!-- TEAM -->
+      <div class="page" id="pg-team">
+        <div class="page-header">
+          <h1>Team Management</h1>
+          <p>Manage doctors, receptionists and other staff in your practice</p>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+          <button class="btn btn-primary" onclick="openInviteModal()">+ Invite Team Member</button>
+        </div>
+        <div class="tbl-wrap" id="members-table-wrap">
+          <div style="padding:16px"><div class="skel skel-row"></div><div class="skel skel-row"></div></div>
+        </div>
+        <div class="section-divider">Pending Invites</div>
+        <div id="pending-invites-wrap">
+          <div class="skel skel-row"></div>
+        </div>
+      </div>
+
+      <!-- BILLING -->
+      <div class="page" id="pg-billing">
+        <div class="page-header">
+          <h1>Billing &amp; Subscription</h1>
+          <p>Manage your practice plan and payment details</p>
+        </div>
+        <div id="billing-content"><div class="skel skel-stat" style="height:140px;margin-bottom:16px"></div></div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="page" id="pg-settings">
+        <div class="page-header">
+          <h1>Practice Settings</h1>
+          <p>Update your practice information and preferences</p>
+        </div>
+        <div class="card" id="settings-form-wrap">
+          <div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- INVITE MODAL -->
+<div class="modal-overlay" id="modal-invite">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Invite Team Member</h2>
+      <button class="modal-close" onclick="closeInviteModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-field">
+        <label>Email Address</label>
+        <input type="email" id="inv-email" placeholder="doctor@example.co.za">
+        <span class="field-error" id="e-inv-email"></span>
+      </div>
+      <div class="form-field">
+        <label>Role</label>
+        <select id="inv-role">
+          <option value="doctor">Doctor</option>
+          <option value="receptionist">Receptionist</option>
+          <option value="nurse">Nurse</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div id="inv-url-section" style="display:none">
+        <div style="font-size:12px;color:var(--ink2);margin-bottom:6px;font-weight:600">Share this invite link:</div>
+        <div class="invite-url-box" id="inv-url"></div>
+        <button class="btn btn-secondary btn-sm" onclick="copyInviteUrl()">📋 Copy Link</button>
+      </div>
+    </div>
+    <div class="modal-foot" id="inv-footer">
+      <button class="btn btn-secondary" onclick="closeInviteModal()">Cancel</button>
+      <button class="btn btn-primary" id="inv-submit-btn" onclick="sendInvite()">Send Invite</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head">
+      <h2 id="confirm-title">Confirm Action</h2>
+      <button class="modal-close" onclick="closeConfirm()">×</button>
+    </div>
+    <div class="modal-body"><p id="confirm-msg" style="font-size:14px;color:var(--ink2);line-height:1.6"></p></div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-rack"></div>
+
+<script>
+const SUPABASE_URL='https://dlyghathovzjlhrcrhgg.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const DOMAIN='https://medconsult.africa';
+const PENDING_KEY='mc_pending_practice_reg';
+
+/* ── STATE ─────────────────────────────────────────────────── */
+const ST={user:null,member:null,practice:null};
+let teamRows=[];
+let currentInviteUrl='';
+
+/* ── HELPERS ───────────────────────────────────────────────── */
+function esc(s){const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML;}
+function fmtDate(d){if(!d)return '—';return new Date(d+'T00:00:00').toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'});}
+function isoToday(){return new Date().toISOString().slice(0,10);}
+function initials(n){return n?n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2):'?';}
+function capitalise(s){return s?s.charAt(0).toUpperCase()+s.slice(1).replace(/_/g,' '):'—';}
+function greeting(){const h=new Date().getHours();return h<12?'Good morning':h<17?'Good afternoon':'Good evening';}
+function fmtCard(el){let v=el.value.replace(/\D/g,'').substring(0,16);el.value=v.replace(/(.{4})/g,'$1 ').trim();}
+function fmtExp(el){let v=el.value.replace(/\D/g,'').substring(0,4);if(v.length>=3)v=v.substring(0,2)+' / '+v.substring(2);el.value=v;}
+function daysUntil(iso){return Math.max(0,Math.ceil((new Date(iso)-Date.now())/(86400000)));}
+
+function toast(msg,type='info'){
+  const rack=document.getElementById('toast-rack');
+  const t=document.createElement('div');t.className=`toast ${type}`;
+  const icons={info:'ℹ️',success:'✅',error:'❌',warning:'⚠️'};
+  t.innerHTML=`<span>${icons[type]||'ℹ️'}</span><span>${esc(msg)}</span>`;
+  rack.appendChild(t);setTimeout(()=>t.remove(),4500);
+}
+function showEl(id,display='flex'){document.getElementById(id).style.display=display;}
+function hideEl(id){document.getElementById(id).style.display='none';}
+function fieldErr(id,msg){const el=document.getElementById(id);if(el){el.textContent=msg;}}
+function clearErr(id){fieldErr(id,'');}
+function markInvalid(id,bad){const el=document.getElementById(id);if(el)el.classList.toggle('input-invalid',bad);}
+function clearFields(...ids){ids.forEach(id=>{clearErr('e-'+id);markInvalid(id,false);});}
+
+/* ── CLOCK ─────────────────────────────────────────────────── */
+function tickClock(){const now=new Date();const el=document.getElementById('topbar-clock');if(el)el.textContent=now.toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',hour12:false});}
+tickClock();setInterval(tickClock,30000);
+
+/* ── SIDEBAR ────────────────────────────────────────────────── */
+function openSidebar(){document.getElementById('sidebar').classList.add('open');document.getElementById('sb-overlay').classList.add('open');}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');document.getElementById('sb-overlay').classList.remove('open');}
+
+/* ── SCREEN SWITCHER ────────────────────────────────────────── */
+function showScreen(name){
+  ['loading-screen','reg-screen','verify-screen','denied-screen','app'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display='none';
+  });
+  const target=document.getElementById(name);
+  if(target) target.style.display=(name==='app')?'flex':(name==='reg-screen')?'block':'flex';
+}
+
+/* ── LOGIN MODAL ────────────────────────────────────────────── */
+function showLogin(){showScreen('reg-screen');document.getElementById('modal-login').classList.add('open');}
+function closeLogin(){document.getElementById('modal-login').classList.remove('open');}
+async function doModalLogin(){
+  const email=document.getElementById('lm-email').value.trim();
+  const pass=document.getElementById('lm-pass').value;
+  const errEl=document.getElementById('login-modal-err');
+  errEl.style.display='none';
+  if(!email||!pass){errEl.style.display='block';errEl.textContent='Please enter your email and password';return;}
+  const btn=document.getElementById('lm-btn');btn.disabled=true;btn.textContent='Signing in…';
+  const {data,error}=await sb.auth.signInWithPassword({email,password:pass});
+  btn.disabled=false;btn.textContent='Sign In →';
+  if(error){errEl.style.display='block';errEl.textContent=error.message;return;}
+  closeLogin();
+  await checkSessionAndRoute(data.user,data.session);
+}
+async function doLogout(){
+  await sb.auth.signOut();
+  localStorage.removeItem(PENDING_KEY);
+  showScreen('reg-screen');
+  toast('Signed out','success');
+}
+
+/* ── BOOT ───────────────────────────────────────────────────── */
+(async()=>{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){
+    const pending=localStorage.getItem(PENDING_KEY);
+    if(pending){document.getElementById('verify-email').textContent=JSON.parse(pending).ownerEmail;showScreen('verify-screen');}
+    else showScreen('reg-screen');
+    return;
+  }
+  await checkSessionAndRoute(session.user,session);
+})();
+
+async function checkSessionAndRoute(user,session){
+  showEl('loading-screen');
+  const {data:member}=await sb.from('practice_members')
+    .select('role,practice_id,practices(id,name,address,phone,email,hpcsa_number,vat_number,bank_account,plan,trial_ends_at,created_at)')
+    .eq('auth_id',user.id)
+    .in('role',['owner','admin'])
+    .maybeSingle();
+
+  if(!member){
+    /* New owner — check for pending setup data */
+    const pending=localStorage.getItem(PENDING_KEY);
+    if(pending&&session){
+      await completePendingSetup(user,JSON.parse(pending));
+      return;
+    }
+    /* Logged in but not owner/admin */
+    document.getElementById('denied-msg').textContent='You are signed in but do not have owner or admin access to any practice. Please contact your practice owner.';
+    showScreen('denied-screen');
+    return;
+  }
+  ST.user=user;ST.member=member;ST.practice=member.practices;
+  setupDashboard();
+}
+
+/* ── COMPLETE PENDING SETUP ─────────────────────────────────── */
+async function completePendingSetup(user,reg){
+  try{
+    /* 1. Insert practice */
+    const trialEnd=new Date(Date.now()+30*86400000).toISOString();
+    const {data:practice,error:pe}=await sb.from('practices').insert({
+      name:reg.practiceName,address:reg.practiceAddr,phone:reg.practicePhone,
+      email:reg.practiceEmail,hpcsa_number:reg.practiceHpcsa,vat_number:reg.practiceVat||null,
+      plan:'practice',trial_ends_at:trialEnd
+    }).select().single();
+    if(pe) throw pe;
+
+    /* 2. Insert doctor */
+    const {data:doctor,error:de}=await sb.from('doctors').insert({
+      auth_id:user.id,first_name:reg.ownerFn,last_name:reg.ownerLn,
+      specialization:reg.ownerSpec,hpcsa_number:reg.ownerHpcsa,
+      signature_name:reg.ownerSig,practice_id:practice.id
+    }).select().single();
+    if(de) throw de;
+
+    /* 3. Insert owner as practice member */
+    await sb.from('practice_members').insert({
+      auth_id:user.id,practice_id:practice.id,role:'owner',
+      status:'active',email:reg.ownerEmail
+    });
+
+    /* 4. Insert team invites */
+    for(const m of (reg.team||[])){
+      const token=crypto.randomUUID();
+      await sb.from('practice_invites').insert({
+        practice_id:practice.id,email:m.email,role:m.role,
+        token,status:'pending',
+        expires_at:new Date(Date.now()+7*86400000).toISOString()
+      });
+    }
+
+    /* 5. Seed availability */
+    await sb.rpc('seed_default_availability',{p_doctor_id:doctor.id}).catch(()=>{});
+
+    localStorage.removeItem(PENDING_KEY);
+    ST.user=user;ST.practice=practice;
+    ST.member={role:'owner',practice_id:practice.id};
+    setupDashboard();
+    toast('Practice registered successfully! Welcome to MedConsult.','success');
+  }catch(err){
+    showScreen('denied-screen');
+    document.getElementById('denied-msg').textContent='Setup error: '+err.message+'. Please contact support.';
+  }
+}
+
+/* ── DASHBOARD SETUP ────────────────────────────────────────── */
+function setupDashboard(){
+  const meta=ST.user.user_metadata||{};
+  const name=meta.fn?`${meta.fn} ${meta.ln||''}`.trim():ST.user.email;
+  document.getElementById('sb-practice-name').textContent=ST.practice?.name||'Your Practice';
+  document.getElementById('sb-uname').textContent=name;
+  document.getElementById('sb-avatar').textContent=initials(name);
+  showScreen('app');
+  document.getElementById('app').style.display='flex';
+  loadOverview();
+}
+
+/* ── NAV ────────────────────────────────────────────────────── */
+const PAGE_TITLES={overview:'Overview',team:'Team Management',billing:'Billing & Subscription',settings:'Practice Settings'};
+function nav(pg,el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('pg-'+pg).classList.add('active');
+  if(el)el.classList.add('active');
+  else document.getElementById('ni-'+pg).classList.add('active');
+  document.getElementById('topbar-title').textContent=PAGE_TITLES[pg]||pg;
+  closeSidebar();
+  if(pg==='overview')loadOverview();
+  if(pg==='team')loadTeam();
+  if(pg==='billing')loadBilling();
+  if(pg==='settings')loadSettings();
+}
+
+/* ── OVERVIEW ───────────────────────────────────────────────── */
+async function loadOverview(){
+  /* Trial banner */
+  const trialEnd=ST.practice?.trial_ends_at;
+  const bannerWrap=document.getElementById('trial-banner-wrap');
+  if(trialEnd){
+    const days=daysUntil(trialEnd);
+    const color=days<=7?'var(--danger)':days<=14?'var(--warning)':'var(--azure)';
+    bannerWrap.innerHTML=`<div class="trial-banner" style="border-color:${color}33;background:${color}11">
+      <div><div class="trial-text" style="color:${color}">🗓 ${days} day${days!==1?'s':''} remaining in your free trial</div>
+      <div class="trial-sub">Trial ends ${fmtDate(trialEnd)} — add payment details to continue uninterrupted</div></div>
+      <button class="btn btn-primary btn-sm" onclick="nav('billing',document.getElementById('ni-billing'))">Manage Billing</button>
+    </div>`;
+  } else bannerWrap.innerHTML='';
+
+  const pid=ST.practice?.id;
+  const today=isoToday();
+  const now=new Date();
+  const firstOfMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+
+  const [{data:docs},{data:appts},{data:monthAppts}]=await Promise.all([
+    sb.from('doctors').select('id,first_name,last_name,specialization').eq('practice_id',pid),
+    sb.from('appointments').select('doctor_id,status').eq('date',today),
+    sb.from('appointments').select('id,doctor_id').gte('date',firstOfMonth).lte('date',today)
+  ]);
+
+  const docIds=(docs||[]).map(d=>d.id);
+  let patCount=0;
+  if(docIds.length){
+    const {count}=await sb.from('patients').select('id',{count:'exact',head:true}).in('doctor_id',docIds);
+    patCount=count||0;
+  }
+
+  /* Stats */
+  const todayAppts=(appts||[]).filter(a=>docIds.includes(a.doctor_id));
+  const monthApptCount=(monthAppts||[]).filter(a=>docIds.includes(a.doctor_id)).length;
+  document.getElementById('dash-stats').innerHTML=`
+    <div class="stat-card"><div class="stat-label">Doctors</div><div class="stat-value">${docs?.length||0}</div><div class="stat-sub">in practice</div></div>
+    <div class="stat-card"><div class="stat-label">Patients</div><div class="stat-value">${patCount}</div><div class="stat-sub">across all doctors</div></div>
+    <div class="stat-card"><div class="stat-label">Appointments</div><div class="stat-value">${monthApptCount}</div><div class="stat-sub">this month</div></div>
+    <div class="stat-card"><div class="stat-label">Today</div><div class="stat-value">${todayAppts.length}</div><div class="stat-sub">appointments</div></div>`;
+
+  /* Doctor list */
+  if(!docs?.length){
+    document.getElementById('doc-list-overview').innerHTML=`<div class="empty"><div class="empty-icon">🩺</div><div class="empty-title">No doctors yet</div><div class="empty-sub">Invite doctors from the Team Management page</div></div>`;
+    return;
+  }
+  document.getElementById('doc-list-overview').innerHTML=docs.map(d=>{
+    const count=todayAppts.filter(a=>a.doctor_id===d.id).length;
+    return `<div class="doctor-list-item">
+      <div class="doc-avatar-sm">${initials(d.first_name+' '+d.last_name)}</div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">Dr. ${esc(d.first_name)} ${esc(d.last_name)}</div>
+        <div style="font-size:12px;color:var(--ink2)">${esc(d.specialization||'General Practitioner')}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700">${count}</div>
+        <div style="font-size:11px;color:var(--ink3)">today</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ── TEAM ───────────────────────────────────────────────────── */
+async function loadTeam(){
+  const pid=ST.practice?.id;
+  const [{data:members},{data:invites}]=await Promise.all([
+    sb.from('practice_members').select('id,auth_id,email,role,status,created_at').eq('practice_id',pid).order('created_at'),
+    sb.from('practice_invites').select('id,email,role,token,status,created_at,expires_at').eq('practice_id',pid).eq('status','pending').order('created_at',{ascending:false})
+  ]);
+
+  /* Members table */
+  const wrap=document.getElementById('members-table-wrap');
+  if(!members?.length){
+    wrap.innerHTML=`<div class="empty"><div class="empty-icon">👥</div><div class="empty-title">No team members yet</div><div class="empty-sub">Invite your first team member above</div></div>`;
+  } else {
+    const rolePill=(r)=>r==='doctor'||r==='owner'?'pill-blue':'pill-grey';
+    wrap.innerHTML=`<table><thead><tr><th>Name / Email</th><th>Role</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+    <tbody>${members.map(m=>`<tr>
+      <td><div style="font-weight:600">${esc(m.email)}</div></td>
+      <td><span class="pill ${rolePill(m.role)}">${capitalise(m.role)}</span></td>
+      <td>${m.status==='active'?'<span class="pill pill-green">Active</span>':m.status==='suspended'?'<span class="pill pill-red">Suspended</span>':'<span class="pill pill-grey">'+capitalise(m.status)+'</span>'}</td>
+      <td>${fmtDate(m.created_at)}</td>
+      <td><div class="member-actions">
+        <button class="btn btn-secondary btn-sm" onclick="changeRole('${m.id}','${m.role}')">Role</button>
+        ${m.status!=='suspended'?`<button class="btn btn-secondary btn-sm" onclick="suspendMember('${m.id}')">Suspend</button>`:`<button class="btn btn-secondary btn-sm" onclick="unsuspendMember('${m.id}')">Reinstate</button>`}
+        <button class="btn btn-danger btn-sm" onclick="removeMember('${m.id}')">Remove</button>
+      </div></td>
+    </tr>`).join('')}</tbody></table>`;
+  }
+
+  /* Pending invites */
+  const piWrap=document.getElementById('pending-invites-wrap');
+  if(!invites?.length){
+    piWrap.innerHTML=`<div style="font-size:13px;color:var(--ink3);padding:12px 0">No pending invites</div>`;
+    return;
+  }
+  piWrap.innerHTML=`<div class="card">${invites.map(inv=>{
+    const url=inv.role==='doctor'?`${DOMAIN}/index.html?invite=${inv.token}`:`${DOMAIN}/reception.html?invite=${inv.token}`;
+    return `<div class="pending-invite-row">
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">${esc(inv.email)}</div>
+        <div style="font-size:11px;color:var(--ink2)"><span class="pill ${inv.role==='doctor'?'pill-blue':'pill-grey'}">${capitalise(inv.role)}</span> · Invited ${fmtDate(inv.created_at)} · Expires ${fmtDate(inv.expires_at)}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap">
+        <button class="btn btn-secondary btn-sm" onclick="copyText('${url}')">📋 Copy Link</button>
+        <button class="btn btn-secondary btn-sm" onclick="resendInvite('${inv.id}')">Resend</button>
+        <button class="btn btn-danger btn-sm" onclick="cancelInvite('${inv.id}')">Cancel</button>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function copyText(txt){navigator.clipboard.writeText(txt).then(()=>toast('Link copied to clipboard','success'));}
+async function resendInvite(id){
+  const expires=new Date(Date.now()+7*86400000).toISOString();
+  const {error}=await sb.from('practice_invites').update({expires_at:expires,status:'pending'}).eq('id',id);
+  if(error){toast(error.message,'error');return;}
+  toast('Invite resent — link is now valid for 7 more days','success');loadTeam();
+}
+async function cancelInvite(id){
+  if(!confirm('Cancel this invite?'))return;
+  await sb.from('practice_invites').update({status:'cancelled'}).eq('id',id);
+  toast('Invite cancelled','success');loadTeam();
+}
+async function suspendMember(id){
+  const {error}=await sb.from('practice_members').update({status:'suspended'}).eq('id',id);
+  if(error){toast(error.message,'error');return;}
+  toast('Member suspended','warning');loadTeam();
+}
+async function unsuspendMember(id){
+  const {error}=await sb.from('practice_members').update({status:'active'}).eq('id',id);
+  if(error){toast(error.message,'error');return;}
+  toast('Member reinstated','success');loadTeam();
+}
+async function removeMember(id){
+  confirmAction('Remove this team member?','They will lose access immediately. This cannot be undone.',async()=>{
+    await sb.from('practice_members').delete().eq('id',id);
+    toast('Member removed','success');loadTeam();
+  });
+}
+async function changeRole(id,current){
+  const newRole=prompt(`Change role (current: ${current}):\nType: owner, admin, doctor, receptionist, nurse`);
+  if(!newRole)return;
+  const valid=['owner','admin','doctor','receptionist','nurse'];
+  if(!valid.includes(newRole)){toast('Invalid role','error');return;}
+  await sb.from('practice_members').update({role:newRole}).eq('id',id);
+  toast('Role updated','success');loadTeam();
+}
+
+/* ── INVITE MODAL ───────────────────────────────────────────── */
+function openInviteModal(){
+  currentInviteUrl='';
+  document.getElementById('inv-email').value='';
+  document.getElementById('inv-role').value='doctor';
+  document.getElementById('e-inv-email').textContent='';
+  document.getElementById('inv-url-section').style.display='none';
+  document.getElementById('inv-footer').innerHTML=`<button class="btn btn-secondary" onclick="closeInviteModal()">Cancel</button><button class="btn btn-primary" id="inv-submit-btn" onclick="sendInvite()">Send Invite</button>`;
+  document.getElementById('modal-invite').classList.add('open');
+}
+function closeInviteModal(){document.getElementById('modal-invite').classList.remove('open');}
+function copyInviteUrl(){copyText(currentInviteUrl);}
+async function sendInvite(){
+  const email=document.getElementById('inv-email').value.trim();
+  const role=document.getElementById('inv-role').value;
+  document.getElementById('e-inv-email').textContent='';
+  if(!email||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+    document.getElementById('e-inv-email').textContent='Please enter a valid email address';return;
+  }
+  const btn=document.getElementById('inv-submit-btn');
+  btn.disabled=true;btn.textContent='Sending…';
+  const token=crypto.randomUUID();
+  const {error}=await sb.from('practice_invites').insert({
+    practice_id:ST.practice?.id,email,role,token,status:'pending',
+    expires_at:new Date(Date.now()+7*86400000).toISOString()
+  });
+  btn.disabled=false;btn.textContent='Send Invite';
+  if(error){toast(error.message,'error');return;}
+  currentInviteUrl=role==='doctor'?`${DOMAIN}/index.html?invite=${token}`:`${DOMAIN}/reception.html?invite=${token}`;
+  document.getElementById('inv-url').textContent=currentInviteUrl;
+  document.getElementById('inv-url-section').style.display='block';
+  document.getElementById('inv-footer').innerHTML=`<button class="btn btn-secondary" onclick="closeInviteModal()">Done</button><button class="btn btn-primary" onclick="copyInviteUrl()">📋 Copy Link</button>`;
+  toast('Invite created successfully','success');
+  loadTeam();
+}
+
+/* ── BILLING ────────────────────────────────────────────────── */
+async function loadBilling(){
+  const p=ST.practice;
+  const trialEnd=p?.trial_ends_at;
+  const days=trialEnd?daysUntil(trialEnd):0;
+  const statusLabel=trialEnd&&new Date(trialEnd)>Date.now()?`Trial — ${days} day${days!==1?'s':''} left`:'Active';
+  const statusColor=trialEnd&&new Date(trialEnd)>Date.now()?(days<=7?'#dc2626':days<=14?'#d97706':'rgba(255,255,255,.9)'):'rgba(255,255,255,.9)';
+
+  document.getElementById('billing-content').innerHTML=`
+    <div class="plan-card-dash">
+      <div class="plan-card-name">Practice Plan</div>
+      <div class="plan-card-price">R 5,000<span> / month</span></div>
+      <div class="plan-card-status" style="background:rgba(255,255,255,.15);color:${statusColor}">📌 ${esc(statusLabel)}</div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Subscription Details</div>
+      <div class="billing-info-row"><span class="billing-info-label">Plan</span><span class="billing-info-value">Practice Plan</span></div>
+      <div class="billing-info-row"><span class="billing-info-label">Status</span><span class="billing-info-value">${esc(statusLabel)}</span></div>
+      <div class="billing-info-row"><span class="billing-info-label">Trial ends</span><span class="billing-info-value">${trialEnd?fmtDate(trialEnd):'—'}</span></div>
+      <div class="billing-info-row"><span class="billing-info-label">Payment method</span><span class="billing-info-value">•••• •••• •••• — <span style="color:var(--ink2);font-size:12px">Not yet added</span></span></div>
+      <div class="billing-info-row"><span class="billing-info-label">Next billing date</span><span class="billing-info-value">${trialEnd?fmtDate(trialEnd):'—'}</span></div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">What's Included</div>
+      <div class="includes-grid">
+        <div class="includes-item"><span class="ic">✅</span> Unlimited doctors</div>
+        <div class="includes-item"><span class="ic">✅</span> Unlimited patients</div>
+        <div class="includes-item"><span class="ic">✅</span> Reception accounts</div>
+        <div class="includes-item"><span class="ic">✅</span> Shared calendar</div>
+        <div class="includes-item"><span class="ic">✅</span> Practice reporting</div>
+        <div class="includes-item"><span class="ic">✅</span> Digital sick notes</div>
+        <div class="includes-item"><span class="ic">✅</span> Priority support</div>
+        <div class="includes-item"><span class="ic">✅</span> POPIA compliant</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title">Billing History</div>
+      <div class="empty" style="padding:24px"><div class="empty-icon">🧾</div><div class="empty-title">No invoices yet</div><div class="empty-sub">Your first invoice will appear here after your trial ends</div></div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="toast('Payment method update — contact support@medconsult.africa','info')">Update Payment Method</button>
+      <button class="btn btn-danger" onclick="confirmCancelSub()">Cancel Subscription</button>
+    </div>`;
+}
+function confirmCancelSub(){
+  confirmAction('Cancel your subscription?','Your practice and all data will remain accessible until the end of the current billing period. This cannot be undone.',async()=>{
+    toast('Cancellation request received — our team will contact you within 24 hours.','warning');
+  });
+}
+
+/* ── SETTINGS ───────────────────────────────────────────────── */
+async function loadSettings(){
+  const p=ST.practice;
+  document.getElementById('settings-form-wrap').innerHTML=`
+    <div class="card-title">Practice Information</div>
+    <div class="form-row">
+      <div class="form-field"><label>Practice Name</label><input type="text" id="set-name" value="${esc(p?.name||'')}"></div>
+      <div class="form-field"><label>Practice Phone</label><input type="tel" id="set-phone" value="${esc(p?.phone||'')}"></div>
+    </div>
+    <div class="form-field"><label>Address</label><input type="text" id="set-addr" value="${esc(p?.address||'')}"></div>
+    <div class="form-row">
+      <div class="form-field"><label>Practice Email</label><input type="email" id="set-email" value="${esc(p?.email||'')}"></div>
+      <div class="form-field"><label>HPCSA Practice Number</label><input type="text" id="set-hpcsa" value="${esc(p?.hpcsa_number||'')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-field"><label>VAT Number <span style="font-weight:400;color:var(--ink3)">(optional)</span></label><input type="text" id="set-vat" value="${esc(p?.vat_number||'')}"></div>
+      <div class="form-field"><label>Bank Account (for patient EFTs)</label><input type="text" id="set-bank" value="${esc(p?.bank_account||'')}" placeholder="e.g. FNB, Acc: 62123456, Branch: 250655"></div>
+    </div>
+    <div class="form-field" style="margin-top:4px">
+      <label>Practice Logo</label>
+      <div style="border:2px dashed var(--border);border-radius:var(--radius-sm);padding:24px;text-align:center;color:var(--ink3);font-size:13px;cursor:pointer" onclick="toast('Logo upload — coming soon','info')">
+        📷 Click to upload practice logo (PNG or JPG, max 2MB) — coming soon
+      </div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-primary" id="save-settings-btn" onclick="saveSettings()">Save Changes</button>
+    </div>
+    <div class="field-error" id="settings-err" style="text-align:right;margin-top:8px"></div>`;
+}
+async function saveSettings(){
+  const updates={
+    name:document.getElementById('set-name').value.trim(),
+    phone:document.getElementById('set-phone').value.trim(),
+    address:document.getElementById('set-addr').value.trim(),
+    email:document.getElementById('set-email').value.trim(),
+    hpcsa_number:document.getElementById('set-hpcsa').value.trim(),
+    vat_number:document.getElementById('set-vat').value.trim()||null,
+    bank_account:document.getElementById('set-bank').value.trim()||null
+  };
+  const btn=document.getElementById('save-settings-btn');
+  btn.disabled=true;btn.textContent='Saving…';
+  const {error}=await sb.from('practices').update(updates).eq('id',ST.practice?.id);
+  btn.disabled=false;btn.textContent='Save Changes';
+  if(error){document.getElementById('settings-err').textContent=error.message;return;}
+  Object.assign(ST.practice,updates);
+  document.getElementById('sb-practice-name').textContent=updates.name;
+  toast('Practice settings saved','success');
+}
+
+/* ── CONFIRM MODAL ──────────────────────────────────────────── */
+let confirmCallback=null;
+function confirmAction(title,msg,cb){
+  document.getElementById('confirm-title').textContent=title;
+  document.getElementById('confirm-msg').textContent=msg;
+  confirmCallback=cb;
+  document.getElementById('modal-confirm').classList.add('open');
+}
+function closeConfirm(){document.getElementById('modal-confirm').classList.remove('open');confirmCallback=null;}
+document.getElementById('confirm-ok-btn').onclick=async()=>{if(confirmCallback){await confirmCallback();}closeConfirm();};
+
+/* ═══════════════════════════════════════════════════════════
+   REGISTRATION FLOW
+═══════════════════════════════════════════════════════════ */
+let currentStep=1;
+
+function updateStepIndicator(step){
+  for(let i=1;i<=4;i++){
+    const circle=document.getElementById('sc-'+i);
+    const label=document.getElementById('sl-'+i);
+    if(i<step){circle.className='step-circle done';circle.textContent='✓';}
+    else if(i===step){circle.className='step-circle active';circle.textContent=i;}
+    else{circle.className='step-circle';circle.textContent=i;}
+    label.className='step-label'+(i<step?' done':i===step?' active':'');
+  }
+}
+
+function goStep(n){
+  if(n>currentStep&&!validateStep(currentStep))return;
+  document.querySelectorAll('.step-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('step-'+n).classList.add('active');
+  currentStep=n;
+  updateStepIndicator(n);
+  if(n===3&&teamRows.length===0)addTeamRow();
+}
+
+function validateStep(n){
+  if(n===1){
+    clearFields('s1-name','s1-addr','s1-phone','s1-email','s1-hpcsa');
+    let ok=true;
+    const v=(id,msg)=>{const el=document.getElementById(id);if(!el.value.trim()){fieldErr('e-'+id,msg);markInvalid(id,true);ok=false;}};
+    v('s1-name','Practice name is required');
+    v('s1-addr','Address is required');
+    v('s1-phone','Phone number is required');
+    const em=document.getElementById('s1-email').value.trim();
+    if(!em||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){fieldErr('e-s1-email','Valid email required');markInvalid('s1-email',true);ok=false;}
+    v('s1-hpcsa','HPCSA practice number is required');
+    return ok;
+  }
+  if(n===2){
+    clearFields('s2-fn','s2-ln','s2-email','s2-pw','s2-spec','s2-hpcsa','s2-sig');
+    let ok=true;
+    const v=(id,msg)=>{const el=document.getElementById(id);if(!el.value.trim()){fieldErr('e-'+id,msg);markInvalid(id,true);ok=false;}};
+    v('s2-fn','First name is required');v('s2-ln','Last name is required');
+    const em=document.getElementById('s2-email').value.trim();
+    if(!em||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){fieldErr('e-s2-email','Valid email required');markInvalid('s2-email',true);ok=false;}
+    const pw=document.getElementById('s2-pw').value;
+    if(!pw||pw.length<8){fieldErr('e-s2-pw','Password must be at least 8 characters');markInvalid('s2-pw',true);ok=false;}
+    if(!document.getElementById('s2-spec').value){fieldErr('e-s2-spec','Please select a specialisation');markInvalid('s2-spec',true);ok=false;}
+    v('s2-hpcsa','Personal HPCSA number is required');v('s2-sig','Signature name is required');
+    return ok;
+  }
+  if(n===4){
+    /* validate step 4 billing */
+    clearFields('s4-card','s4-exp','s4-cvv','s4-cname');
+    let ok=true;
+    const card=document.getElementById('s4-card').value.replace(/\s/g,'');
+    if(!card||card.length<16){fieldErr('e-s4-card','Valid 16-digit card number required');markInvalid('s4-card',true);ok=false;}
+    const exp=document.getElementById('s4-exp').value.trim();
+    if(!exp||exp.length<7){fieldErr('e-s4-exp','Valid expiry date required (MM / YY)');markInvalid('s4-exp',true);ok=false;}
+    const cvv=document.getElementById('s4-cvv').value.trim();
+    if(!cvv||cvv.length<3){fieldErr('e-s4-cvv','CVV must be 3–4 digits');markInvalid('s4-cvv',true);ok=false;}
+    if(!document.getElementById('s4-cname').value.trim()){fieldErr('e-s4-cname','Name on card is required');markInvalid('s4-cname',true);ok=false;}
+    return ok;
+  }
+  return true;
+}
+
+/* ── TEAM ROWS ──────────────────────────────────────────────── */
+function addTeamRow(){
+  const id=Date.now();
+  teamRows.push({id});
+  renderTeamRows();
+}
+function removeTeamRow(id){
+  teamRows=teamRows.filter(r=>r.id!==id);
+  renderTeamRows();
+}
+function renderTeamRows(){
+  const wrap=document.getElementById('team-rows');
+  if(!teamRows.length){wrap.innerHTML='';return;}
+  wrap.innerHTML=teamRows.map(r=>`
+    <div class="team-member-row" id="tmr-${r.id}">
+      <div><label style="font-size:11px;font-weight:600;color:var(--grey-300);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:4px">Email</label>
+        <input type="email" id="tm-email-${r.id}" placeholder="colleague@practice.co.za" style="background:var(--grey-700);border:1px solid var(--grey-600);border-radius:6px;padding:9px 10px;font-size:13px;color:var(--white);width:100%">
+      </div>
+      <div><label style="font-size:11px;font-weight:600;color:var(--grey-300);text-transform:uppercase;letter-spacing:.3px;display:block;margin-bottom:4px">Role</label>
+        <select id="tm-role-${r.id}" style="background:var(--grey-700);border:1px solid var(--grey-600);border-radius:6px;padding:9px 10px;font-size:13px;color:var(--white);width:100%;cursor:pointer">
+          <option value="doctor">Doctor</option>
+          <option value="receptionist">Receptionist</option>
+          <option value="nurse">Nurse</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <button class="remove-member-btn" onclick="removeTeamRow(${r.id})" title="Remove">×</button>
+    </div>`).join('');
+}
+
+/* ── LAUNCH TRIAL ───────────────────────────────────────────── */
+async function launchTrial(){
+  if(!validateStep(4))return;
+  const btn=document.getElementById('launch-btn');
+  const errEl=document.getElementById('reg-error');
+  btn.disabled=true;btn.textContent='Launching…';errEl.style.display='none';
+
+  const ownerEmail=document.getElementById('s2-email').value.trim();
+  const ownerPw=document.getElementById('s2-pw').value;
+
+  /* Collect team */
+  const team=teamRows.map(r=>({
+    email:(document.getElementById('tm-email-'+r.id)?.value||'').trim(),
+    role:document.getElementById('tm-role-'+r.id)?.value||'doctor'
+  })).filter(m=>m.email&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m.email));
+
+  /* Store reg data for post-verification setup */
+  const regData={
+    practiceName:document.getElementById('s1-name').value.trim(),
+    practiceAddr:document.getElementById('s1-addr').value.trim(),
+    practicePhone:document.getElementById('s1-phone').value.trim(),
+    practiceEmail:document.getElementById('s1-email').value.trim(),
+    practiceHpcsa:document.getElementById('s1-hpcsa').value.trim(),
+    practiceVat:document.getElementById('s1-vat').value.trim(),
+    ownerFn:document.getElementById('s2-fn').value.trim(),
+    ownerLn:document.getElementById('s2-ln').value.trim(),
+    ownerEmail,
+    ownerSpec:document.getElementById('s2-spec').value,
+    ownerHpcsa:document.getElementById('s2-hpcsa').value.trim(),
+    ownerSig:document.getElementById('s2-sig').value.trim(),
+    team
+  };
+  localStorage.setItem(PENDING_KEY,JSON.stringify(regData));
+
+  /* Sign up */
+  const {data,error}=await sb.auth.signUp({
+    email:ownerEmail,password:ownerPw,
+    options:{data:{fn:regData.ownerFn,ln:regData.ownerLn,spec:regData.ownerSpec,hpcsa:regData.ownerHpcsa,name:`Dr. ${regData.ownerFn} ${regData.ownerLn}`}}
+  });
+  btn.disabled=false;btn.textContent='🚀 Start 30-Day Free Trial';
+
+  if(error){localStorage.removeItem(PENDING_KEY);errEl.style.display='block';errEl.textContent=error.message;return;}
+
+  if(data.session){
+    /* Email verification not required — complete setup immediately */
+    await completePendingSetup(data.user,regData);
+  } else {
+    /* Email verification required */
+    document.getElementById('verify-email').textContent=ownerEmail;
+    showScreen('verify-screen');
+  }
+}
+</script>
+</body>
+</html>

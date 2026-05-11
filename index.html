@@ -1298,6 +1298,8 @@ function markInput(id, invalid) {
 function clearSsErrors(...ids) { ids.forEach(id => { fieldOk('err-su-'+id); markInput('su-'+id, false); }); }
 
 function ssGo(n) {
+  /* Invited doctors skip steps 2 & 3 — accept invite on step 1 next */
+  if (n === 2 && INVITE_DATA) { acceptDoctorInvite(); return; }
   if (n === 2) {
     const fn = document.getElementById('su-fn').value.trim();
     const ln = document.getElementById('su-ln').value.trim();
@@ -1424,14 +1426,92 @@ async function doLogout() {
   document.getElementById('app-main').style.display='none';
 }
 
+// ── INVITE TOKEN HANDLING (practice_invites) ──────────────────
+let INVITE_TOKEN = null, INVITE_DATA = null;
+
+async function checkPracticeInvite() {
+  const token = new URLSearchParams(location.search).get('invite');
+  if (!token) return false;
+  const { data } = await sbClient.from('practice_invites')
+    .select('id,email,role,practice_id,practices(name),status,expires_at')
+    .eq('token', token).eq('status','pending')
+    .gt('expires_at', new Date().toISOString()).maybeSingle();
+  if (!data) { toast('This invite link is invalid or has expired. Contact your practice owner.','error'); return false; }
+  INVITE_TOKEN = token; INVITE_DATA = data;
+  return true;
+}
+
+function applyInviteMode() {
+  switchAuth('signup');
+  // Banner above step 1
+  const ss1 = document.getElementById('ss1');
+  const banner = document.createElement('div');
+  banner.style.cssText = 'background:rgba(43,127,255,.1);border:1px solid rgba(43,127,255,.3);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;color:var(--azure-light);display:flex;align-items:center;gap:8px';
+  banner.innerHTML = `🏥 <span>You've been invited to join <strong>${(INVITE_DATA.practices?.name||'a practice')}</strong> as a <strong>${INVITE_DATA.role}</strong></span>`;
+  ss1.insertBefore(banner, ss1.firstChild);
+  // Pre-fill + lock email
+  const em = document.getElementById('su-email');
+  em.value = INVITE_DATA.email; em.readOnly = true; em.style.opacity = '.7';
+  // Change Step 1 next button to "Accept Invitation →"
+  const nextBtn = ss1.querySelector('button[onclick*="ssGo(2)"]');
+  if (nextBtn) { nextBtn.textContent = 'Accept Invitation →'; }
+  // Note
+  const note = document.createElement('div');
+  note.style.cssText = 'font-size:12px;color:var(--grey-400);margin-top:8px;text-align:center';
+  note.textContent = 'Steps 2 & 3 are skipped — you are joining an existing practice';
+  ss1.appendChild(note);
+}
+
+async function acceptDoctorInvite() {
+  const fn = document.getElementById('su-fn').value.trim();
+  const ln = document.getElementById('su-ln').value.trim();
+  const pw = document.getElementById('su-pw').value;
+  const spec = document.getElementById('su-spec')?.value || 'General Practitioner';
+  const hpcsa = document.getElementById('su-hpcsa')?.value?.trim() || '';
+  if (!fn||!ln||!pw||pw.length<8) { toast('Please fill in your name and password (min 8 chars)','error'); return; }
+  const btn = document.querySelector('#ss1 button');
+  if (btn) { btn.disabled=true; btn.textContent='Creating account…'; }
+  const { data, error } = await sbClient.auth.signUp({
+    email: INVITE_DATA.email, password: pw,
+    options:{ data:{ fn, ln, spec, hpcsa, name:`Dr. ${fn} ${ln}`, plan:'practice' } }
+  });
+  if (error) { toast(error.message,'error'); if(btn){btn.disabled=false;btn.textContent='Accept Invitation →';} return; }
+  const user = data.user;
+  // Insert doctor record
+  const { data: doc } = await sbClient.from('doctors').insert({
+    auth_id: user.id, first_name: fn, last_name: ln, specialization: spec,
+    hpcsa_number: hpcsa, practice_id: INVITE_DATA.practice_id
+  }).select().single();
+  // Add to practice_members
+  await sbClient.from('practice_members').insert({
+    auth_id: user.id, practice_id: INVITE_DATA.practice_id,
+    role: INVITE_DATA.role, status: 'active', email: INVITE_DATA.email
+  });
+  // Mark invite accepted
+  await sbClient.from('practice_invites').update({ status:'accepted' }).eq('token', INVITE_TOKEN);
+  // Seed availability
+  if (doc?.id) await sbClient.rpc('seed_default_availability',{p_doctor_id:doc.id}).catch(()=>{});
+  toast(`Welcome to ${INVITE_DATA.practices?.name||'the practice'}!`,'success');
+  // Sign in properly if session not active yet
+  if (!data.session) {
+    const { data: sd } = await sbClient.auth.signInWithPassword({ email: INVITE_DATA.email, password: pw });
+    if (sd?.user) { S.doc = docFromMeta(sd.user.user_metadata, sd.user.email); S.plan = 'practice'; launchApp(); }
+  } else {
+    S.doc = docFromMeta(data.user.user_metadata, data.user.email); S.plan = 'practice'; launchApp();
+  }
+}
+
 // Restore session on page load
 (async () => {
+  const hasInvite = await checkPracticeInvite();
   const { data: { session } } = await sbClient.auth.getSession();
   if (session) {
     const meta = session.user.user_metadata;
     S.doc = docFromMeta(meta, session.user.email);
     S.plan = meta.plan || 'pro';
     launchApp();
+  } else if (hasInvite) {
+    applyInviteMode();
   }
 })();
 
