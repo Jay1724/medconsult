@@ -933,7 +933,7 @@ async function loadTeam(){
     return;
   }
   piWrap.innerHTML=`<div class="card">${invites.map(inv=>{
-    const url=inv.role==='doctor'?`${DOMAIN}/index.html?invite=${inv.token}`:`${DOMAIN}/reception.html?invite=${inv.token}`;
+    const url=inv.role==='doctor'?`${DOMAIN}/doctor.html?invite=${inv.token}`:`${DOMAIN}/reception.html?invite=${inv.token}`;
     return `<div class="pending-invite-row">
       <div style="flex:1">
         <div style="font-weight:600;font-size:13px">${esc(inv.email)}</div>
@@ -1013,7 +1013,7 @@ async function sendInvite(){
   });
   btn.disabled=false;btn.textContent='Send Invite';
   if(error){toast(error.message,'error');return;}
-  currentInviteUrl=role==='doctor'?`${DOMAIN}/index.html?invite=${token}`:`${DOMAIN}/reception.html?invite=${token}`;
+  currentInviteUrl=role==='doctor'?`${DOMAIN}/doctor.html?invite=${token}`:`${DOMAIN}/reception.html?invite=${token}`;
   document.getElementById('inv-url').textContent=currentInviteUrl;
   document.getElementById('inv-url-section').style.display='block';
   document.getElementById('inv-footer').innerHTML=`<button class="btn btn-secondary" onclick="closeInviteModal()">Done</button><button class="btn btn-primary" onclick="copyInviteUrl()">📋 Copy Link</button>`;
