@@ -212,6 +212,24 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
 .reveal-delay-2{transition-delay:0.2s}
 .reveal-delay-3{transition-delay:0.3s}
 
+/* PORTAL SECTION */
+.portal-section{background:var(--black);padding:100px 48px;border-top:1px solid var(--grey-800)}
+.portal-inner{max-width:1200px;margin:0 auto}
+.portal-heading{font-family:'Playfair Display',serif;font-size:clamp(28px,3.5vw,42px);font-weight:700;letter-spacing:-1px;color:var(--white);text-align:center;margin-bottom:10px}
+.portal-subheading{text-align:center;font-size:15px;color:var(--grey-500);margin-bottom:56px}
+.portal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.portal-card{background:var(--grey-900);border:1px solid var(--grey-800);border-radius:var(--radius-lg);padding:32px 28px;display:flex;flex-direction:column;align-items:flex-start;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1)}
+.portal-card:hover{transform:translateY(-5px);border-color:var(--grey-600);box-shadow:0 24px 60px rgba(0,0,0,0.5)}
+.portal-card-icon{width:52px;height:52px;background:var(--white);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:24px;flex-shrink:0}
+.portal-card-label{font-family:'Playfair Display',serif;font-size:20px;font-weight:600;color:var(--white);margin-bottom:8px;letter-spacing:-0.3px}
+.portal-card-sub{font-size:13.5px;color:var(--grey-500);line-height:1.6;margin-bottom:28px;flex:1}
+.btn-portal-azure{width:100%;padding:12px;border-radius:var(--radius-sm);font-family:'Sora',sans-serif;font-size:14px;font-weight:600;cursor:pointer;background:var(--azure);color:var(--white);border:none;transition:all 0.2s;box-shadow:var(--shadow-azure)}
+.btn-portal-azure:hover{background:var(--azure-light);transform:translateY(-1px);box-shadow:0 10px 36px rgba(43,127,255,0.35)}
+.btn-portal-ghost{width:100%;padding:12px;border-radius:var(--radius-sm);font-family:'Sora',sans-serif;font-size:14px;font-weight:600;cursor:pointer;background:transparent;color:var(--white);border:1.5px solid rgba(255,255,255,0.2);transition:all 0.2s}
+.btn-portal-ghost:hover{border-color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.05)}
+@media(max-width:1100px){.portal-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.portal-grid{grid-template-columns:1fr}.portal-section{padding:72px 24px}}
+
 /* RESPONSIVE */
 @media(max-width:1100px){
   .bento-span-4,.bento-span-5,.bento-span-7{grid-column:span 6}
@@ -625,6 +643,40 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
     </div>
   </div>
 </footer>
+
+<!-- PORTAL ENTRY -->
+<section class="portal-section">
+  <div class="portal-inner">
+    <h2 class="portal-heading reveal">Which portal are you looking for?</h2>
+    <p class="portal-subheading reveal">Direct access to every part of the MedConsult platform.</p>
+    <div class="portal-grid">
+      <div class="portal-card reveal reveal-delay-1">
+        <div class="portal-card-icon">🩺</div>
+        <div class="portal-card-label">Doctor</div>
+        <p class="portal-card-sub">Access your patient portal, appointments, clinical records and prescriptions.</p>
+        <button class="btn-portal-azure" onclick="location.href='doctor.html'">Sign In as Doctor</button>
+      </div>
+      <div class="portal-card reveal reveal-delay-2">
+        <div class="portal-card-icon">🏥</div>
+        <div class="portal-card-label">Practice Admin</div>
+        <p class="portal-card-sub">Manage your practice, team members, billing and subscription settings.</p>
+        <button class="btn-portal-ghost" onclick="location.href='practice.html'">Practice Dashboard</button>
+      </div>
+      <div class="portal-card reveal reveal-delay-3">
+        <div class="portal-card-icon">🗂️</div>
+        <div class="portal-card-label">Receptionist</div>
+        <p class="portal-card-sub">Handle appointments, front desk operations and patient check-ins.</p>
+        <button class="btn-portal-ghost" onclick="location.href='reception.html'">Reception Portal</button>
+      </div>
+      <div class="portal-card reveal" style="transition-delay:0.4s">
+        <div class="portal-card-icon">📱</div>
+        <div class="portal-card-label">Patient</div>
+        <p class="portal-card-sub">View your records, upcoming appointments and book new consultations.</p>
+        <button class="btn-portal-ghost" onclick="location.href='patient.html'">Open Patient App</button>
+      </div>
+    </div>
+  </div>
+</section>
 
 <script>
 const navbar=document.getElementById('navbar');
