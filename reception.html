@@ -70,6 +70,9 @@ a{text-decoration:none;color:inherit}
 .nav-item.active{background:var(--azure-dim);color:var(--azure);font-weight:600}
 .nav-icon{font-size:16px;width:20px;text-align:center}
 .sb-footer{padding:16px 20px;border-top:1px solid var(--grey-800)}
+.sb-compliance{padding:10px 20px 14px;font-size:10px;color:var(--grey-600);line-height:1.7;border-top:1px solid var(--grey-800)}
+.sb-compliance a{color:var(--grey-600);text-decoration:none}
+.sb-compliance a:hover{color:var(--white)}
 .sb-user{display:flex;align-items:center;gap:10px}
 .sb-avatar{width:34px;height:34px;border-radius:50%;background:var(--azure-dim);border:1px solid var(--azure-glow);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--azure);flex-shrink:0}
 .sb-uname{font-size:13px;font-weight:600;color:var(--white);line-height:1.2}
@@ -370,6 +373,10 @@ tr:hover td{background:var(--grey-50)}
         </div>
         <button class="sb-logout" onclick="doLogout()" title="Log out">↩</button>
       </div>
+    </div>
+    <div class="sb-compliance">
+      © 2026 MedConsult (Pty) Ltd<br>
+      <a href="#">Privacy Policy</a> · <a href="#">Terms of Service</a> · 🔒 POPIA Compliant
     </div>
   </div>
   <div class="sb-overlay" id="sb-overlay" onclick="closeSidebar()"></div>

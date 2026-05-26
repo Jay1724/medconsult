@@ -239,6 +239,12 @@ a { text-decoration: none; color: inherit; }
   border-radius: 0;
 }
 .sidebar-user:hover { background: var(--grey-800); }
+.sidebar-compliance {
+  padding: 10px 14px 14px; font-size: 10px; color: var(--grey-600);
+  line-height: 1.7; border-top: 1px solid var(--grey-800);
+}
+.sidebar-compliance a { color: var(--grey-600); text-decoration: none; }
+.sidebar-compliance a:hover { color: var(--white); }
 .user-avatar {
   width: 34px; height: 34px; background: var(--azure); border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
@@ -796,6 +802,10 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
     <div class="user-avatar" id="sb-av">DR</div>
     <div><div class="user-name" id="sb-name">Dr. Roberts</div><div class="user-role" id="sb-role">General Practitioner</div></div>
     <div class="user-plan" id="sb-plan">PRO</div>
+  </div>
+  <div class="sidebar-compliance">
+    © 2026 MedConsult (Pty) Ltd<br>
+    <a href="#">Privacy Policy</a> · <a href="#">Terms of Service</a> · 🔒 POPIA Compliant
   </div>
 </aside>
 

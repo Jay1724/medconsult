@@ -162,6 +162,8 @@ body {
 }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
+.compliance-strip { margin-top: 24px; padding: 12px 0 4px; border-top: 1px solid var(--border); font-size: 10px; color: var(--ink2); text-align: center; line-height: 1.8; }
+.compliance-strip a { color: var(--ink2); text-decoration: none; }
 
 /* ── BOTTOM NAV ── */
 .bottom-nav {
@@ -480,6 +482,10 @@ body {
     <div class="tab-panel" id="tab-profile">
       <div id="profile-body"></div>
       <button class="btn-ghost" style="margin-top:8px" onclick="doLogout()">Log out</button>
+      <div class="compliance-strip">
+        © 2026 MedConsult (Pty) Ltd<br>
+        <a href="#">Privacy Policy</a> · <a href="#">Terms of Service</a> · 🔒 POPIA Compliant
+      </div>
     </div>
   </div>
   <nav class="bottom-nav">
