@@ -7,6 +7,7 @@
 <link rel="canonical" href="https://medconsult.africa/terms.html">
 <title>Terms of Service — MedConsult</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
 :root{--black:#0a0a0b;--grey-700:#2a2a2f;--grey-500:#5a5a65;--grey-400:#7f7f8e;--grey-100:#e8e8ef;--grey-50:#f4f4f7;--white:#fff;--azure:#2b7fff;--azure-dim:rgba(43,127,255,.1);--border:#e4e4ec;--warning:#d97706;--warning-bg:#fffbeb}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -65,6 +66,8 @@ tr:last-child td{border-bottom:none}
 
 footer{background:var(--black);color:var(--grey-400);padding:48px;text-align:center;font-size:13px}
 footer a{color:var(--azure)}
+.nav-logo-mark .material-icons{font-size:18px;color:#fff;line-height:1}
+.warning-title .material-icons,.callout-title .material-icons{font-size:18px;line-height:1}
 
 @media(max-width:900px){
   .layout{grid-template-columns:1fr;padding:40px 24px 80px;gap:32px}
@@ -81,7 +84,7 @@ footer a{color:var(--azure)}
 
 <nav>
   <a href="index.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
-    <div class="nav-logo-mark">🩺</div>
+    <div class="nav-logo-mark"><span class="material-icons">medical_services</span></div>
     <div class="nav-logo-text">MedConsult</div>
   </a>
   <button class="btn-back" onclick="window.location='index.html'">← Back to home</button>
@@ -147,7 +150,7 @@ footer a{color:var(--azure)}
 </ul>
 
 <div class="warning">
-<div class="warning-title">⚕️ Important — MedConsult is NOT a Medical Service Provider</div>
+<div class="warning-title"><span class="material-icons">health_and_safety</span> Important — MedConsult is NOT a Medical Service Provider</div>
 <p>MedConsult is a software tool only. We do not provide medical advice, diagnoses, treatment or healthcare services. All clinical decisions, prescriptions, certificates, diagnoses and treatments are made solely by the registered medical practitioner using the Platform, who remains fully and exclusively responsible for the medical care they provide.</p>
 </div>
 </section>
@@ -324,7 +327,7 @@ footer a{color:var(--azure)}
 <h2>10. Medical Disclaimer</h2>
 
 <div class="warning">
-<div class="warning-title">⚕️ Critical Disclaimer</div>
+<div class="warning-title"><span class="material-icons">health_and_safety</span> Critical Disclaimer</div>
 <p>MedConsult is a software tool only. We do not practise medicine, provide medical advice, make diagnoses, prescribe treatments or issue medical certificates. All clinical content generated through the Platform — including but not limited to consultation notes, diagnoses, ICD-10 codes, prescriptions, sick notes and referrals — is created by the registered medical practitioner using the Platform.</p>
 </div>
 
