@@ -7,6 +7,7 @@
 <link rel="canonical" href="https://medconsult.africa/privacy.html">
 <title>Privacy Policy — MedConsult</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
 :root {
   --black:#0a0a0b; --grey-900:#111113; --grey-700:#2a2a2f; --grey-500:#5a5a65;
@@ -66,6 +67,8 @@ tr:last-child td{border-bottom:none}
 
 footer{background:var(--black);color:var(--grey-400);padding:48px;text-align:center;font-size:13px}
 footer a{color:var(--azure)}
+.nav-logo-mark .material-icons{font-size:18px;color:#fff;line-height:1}
+.warning-title .material-icons,.callout-title .material-icons{font-size:18px;line-height:1}
 
 @media(max-width:900px){
   .layout{grid-template-columns:1fr;padding:40px 24px 80px;gap:32px}
@@ -82,7 +85,7 @@ footer a{color:var(--azure)}
 
 <nav>
   <a href="index.html" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit">
-    <div class="nav-logo-mark">🩺</div>
+    <div class="nav-logo-mark"><span class="material-icons">medical_services</span></div>
     <div class="nav-logo-text">MedConsult</div>
   </a>
   <button class="btn-back" onclick="window.location='index.html'">← Back to home</button>
@@ -175,7 +178,7 @@ footer a{color:var(--azure)}
 </ul>
 
 <div class="callout">
-<div class="callout-title">⚖️ Lawful Basis for Special Personal Information</div>
+<div class="callout-title"><span class="material-icons">balance</span> Lawful Basis for Special Personal Information</div>
 <p>We process Special Personal Information (health data) only with explicit consent from the patient, or as necessary for the establishment, exercise or defence of a right or obligation in law, in accordance with POPIA sections 26 and 32.</p>
 </div>
 </section>
@@ -258,7 +261,7 @@ footer a{color:var(--azure)}
 <p>Personal information processed through MedConsult is stored on encrypted servers operated by <strong>Supabase Inc.</strong>, currently located in data centres in the European Union (EU).</p>
 
 <div class="callout">
-<div class="callout-title">🌍 Cross-Border Transfer Notice</div>
+<div class="callout-title"><span class="material-icons">public</span> Cross-Border Transfer Notice</div>
 <p>POPIA section 72 requires disclosure of cross-border data transfer. The EU enforces the General Data Protection Regulation (GDPR), which provides a level of data protection equivalent to or stronger than POPIA. By using MedConsult you consent to this transfer for the purpose of providing the service.</p>
 </div>
 
@@ -331,7 +334,7 @@ footer a{color:var(--azure)}
 <p>To exercise any of these rights, contact our Information Officer using the contact details in Section 13. We will respond to your request within <strong>30 days</strong> of receipt.</p>
 
 <div class="callout">
-<div class="callout-title">⚠️ Limitations on Deletion of Clinical Records</div>
+<div class="callout-title"><span class="material-icons">warning</span> Limitations on Deletion of Clinical Records</div>
 <p>Patient clinical records cannot be deleted before the legal retention period expires (typically 6 years from last consultation, per the National Health Act). This protects both you and your treating practitioner. After the retention period, you may request deletion.</p>
 </div>
 </section>
