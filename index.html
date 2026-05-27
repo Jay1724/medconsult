@@ -7,6 +7,7 @@
 <title>MedConsult — Modern Practice Management for South African Doctors</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <style>
 :root{--black:#0a0a0b;--grey-950:#0d0d0f;--grey-900:#111113;--grey-800:#1c1c1f;--grey-700:#2a2a2f;--grey-600:#3d3d45;--grey-500:#5a5a65;--grey-400:#7f7f8e;--grey-300:#a8a8b8;--grey-200:#d0d0da;--grey-100:#e8e8ef;--grey-50:#f4f4f7;--white:#ffffff;--azure:#2b7fff;--azure-light:#5b9fff;--azure-dark:#1a5fcc;--azure-dim:rgba(43,127,255,0.10);--azure-glow:rgba(43,127,255,0.20);--azure-border:rgba(43,127,255,0.25);--surface:#ffffff;--surface-2:#f7f7fa;--border:#e4e4ec;--radius-sm:10px;--radius:16px;--radius-lg:24px;--radius-xl:32px;--shadow-sm:0 1px 3px rgba(0,0,0,0.06),0 1px 2px rgba(0,0,0,0.04);--shadow:0 4px 20px rgba(0,0,0,0.07),0 2px 8px rgba(0,0,0,0.04);--shadow-lg:0 24px 60px rgba(0,0,0,0.10),0 8px 24px rgba(0,0,0,0.06);--shadow-azure:0 8px 32px rgba(43,127,255,0.25)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -259,12 +260,18 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
   .stats-inner,.footer-inner{grid-template-columns:1fr}
 }
 </style>
+<style>
+.material-icons{line-height:1;vertical-align:middle;user-select:none}
+.nav-logo-mark .material-icons{font-size:18px;color:var(--white)}
+.hero-trust-item .material-icons{font-size:15px}
+.persona-emoji .material-icons{font-size:40px;color:var(--azure)}
+</style>
 </head>
 <body>
 
 <nav id="navbar">
   <div class="nav-logo">
-    <div class="nav-logo-mark">🩺</div>
+    <div class="nav-logo-mark"><span class="material-icons">medical_services</span></div>
     <div class="nav-logo-text">MedConsult</div>
   </div>
   <ul class="nav-links">
@@ -289,13 +296,13 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
     <button class="btn-hero-ghost" onclick="location.href='doctor.html'">Sign in as Doctor</button>
   </div>
   <div class="hero-trust">
-    <div class="hero-trust-item"><span>🔒</span> POPIA Compliant</div>
+    <div class="hero-trust-item"><span class="material-icons">lock</span> POPIA Compliant</div>
     <div class="hero-trust-divider"></div>
-    <div class="hero-trust-item"><span>🏥</span> HPCSA Aligned</div>
+    <div class="hero-trust-item"><span class="material-icons">local_hospital</span> HPCSA Aligned</div>
     <div class="hero-trust-divider"></div>
-    <div class="hero-trust-item"><span>💳</span> PayFast Payments</div>
+    <div class="hero-trust-item"><span class="material-icons">credit_card</span> PayFast Payments</div>
     <div class="hero-trust-divider"></div>
-    <div class="hero-trust-item"><span>🇿🇦</span> Made for South Africa</div>
+    <div class="hero-trust-item"><span class="material-icons">public</span> Made for South Africa</div>
   </div>
 </section>
 
@@ -318,7 +325,7 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
   </div>
   <div class="bento-grid">
     <div class="bento-card bento-span-7 reveal">
-      <div class="bento-card-icon">📋</div>
+      <div class="bento-card-icon"><span class="material-icons">assignment</span></div>
       <div class="bento-card-eyebrow">Patient Management</div>
       <div class="bento-card-title">Complete patient records at your fingertips</div>
       <div class="bento-card-body">Full medical history, allergies, chronic conditions, blood type, medical aid details and emergency contacts — all in one secure profile per patient.</div>
@@ -329,14 +336,14 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       </div>
     </div>
     <div class="bento-card bento-span-5 bento-azure reveal reveal-delay-1">
-      <div class="bento-card-icon">📄</div>
+      <div class="bento-card-icon"><span class="material-icons">description</span></div>
       <div class="bento-card-eyebrow">Digital Documents</div>
       <div class="bento-card-title">Sick notes & prescriptions in seconds</div>
       <div class="bento-card-body">Issue signed medical certificates and electronic prescriptions with your digital signature. Downloadable, printable, shareable via WhatsApp.</div>
       <div class="bento-tag-row"><div class="bento-tag">Digital Signature</div><div class="bento-tag">ICD-10 Codes</div><div class="bento-tag">Print Ready</div><div class="bento-tag">WhatsApp Share</div></div>
     </div>
     <div class="bento-card bento-span-5 bento-tinted reveal">
-      <div class="bento-card-icon">📅</div>
+      <div class="bento-card-icon"><span class="material-icons">event</span></div>
       <div class="bento-card-eyebrow">Smart Scheduling</div>
       <div class="bento-card-title">Patients book their own appointments</div>
       <div class="bento-card-body">Set your working hours and slot duration. Patients see only your available times and book 24/7 from their phone — no calls to reception needed.</div>
@@ -350,14 +357,14 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       </div>
     </div>
     <div class="bento-card bento-span-4 reveal reveal-delay-1">
-      <div class="bento-card-icon">🏥</div>
+      <div class="bento-card-icon"><span class="material-icons">local_hospital</span></div>
       <div class="bento-card-eyebrow">Medical Aid</div>
       <div class="bento-card-title">Claims submitted with one click</div>
       <div class="bento-card-body">Generate and track medical aid claims with ICD-10 codes, tariff codes and patient scheme details all pre-populated from their profile.</div>
       <div class="bento-tag-row"><div class="bento-tag">Discovery</div><div class="bento-tag">Momentum</div><div class="bento-tag">Bonitas</div><div class="bento-tag">GEMS</div><div class="bento-tag">+ All schemes</div></div>
     </div>
     <div class="bento-card bento-span-3 bento-dark reveal reveal-delay-2">
-      <div class="bento-card-icon" style="background:rgba(255,255,255,.08);color:#fff">🧾</div>
+      <div class="bento-card-icon" style="background:rgba(255,255,255,.08);color:#fff"><span class="material-icons">receipt_long</span></div>
       <div class="bento-card-eyebrow" style="color:rgba(255,255,255,.4)">Billing</div>
       <div class="bento-card-title">Professional invoices with VAT</div>
       <div class="bento-card-body">Generate tax invoices with VAT automatically calculated. Medical aid claim details included on every invoice.</div>
@@ -368,37 +375,37 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       </div>
     </div>
     <div class="bento-card bento-span-4 reveal">
-      <div class="bento-card-icon">📹</div>
+      <div class="bento-card-icon"><span class="material-icons">videocam</span></div>
       <div class="bento-card-eyebrow">Telehealth</div>
       <div class="bento-card-title">WhatsApp video consultations built in</div>
       <div class="bento-card-body">Start a video call with any patient directly from their profile. Works on any phone — no app download required for patients.</div>
-      <div style="margin-top:20px;background:#25d366;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px"><span style="font-size:20px">📱</span><div style="color:#fff;font-size:13px;font-weight:600">Open WhatsApp Video Call</div></div>
+      <div style="margin-top:20px;background:#25d366;border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px"><span class="material-icons" style="font-size:20px;color:#fff">smartphone</span><div style="color:#fff;font-size:13px;font-weight:600">Open WhatsApp Video Call</div></div>
     </div>
     <div class="bento-card bento-span-5 reveal reveal-delay-1">
-      <div class="bento-card-icon">👥</div>
+      <div class="bento-card-icon"><span class="material-icons">group</span></div>
       <div class="bento-card-eyebrow">Team Management</div>
       <div class="bento-card-title">Role-based access for your whole team</div>
       <div class="bento-card-body">Doctors see everything. Receptionists manage appointments and demographics only — clinical records are locked at database level, not just hidden in the UI.</div>
       <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
-        <div style="background:var(--grey-50);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:12.5px"><span>👨‍⚕️</span><div><div style="font-weight:600;color:var(--black)">Doctor</div><div style="font-size:11px;color:var(--grey-400)">Full clinical + admin access</div></div><div style="margin-left:auto;background:var(--azure-dim);color:var(--azure);font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px">Full</div></div>
-        <div style="background:var(--grey-50);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:12.5px"><span>🗂️</span><div><div style="font-weight:600;color:var(--black)">Receptionist</div><div style="font-size:11px;color:var(--grey-400)">Appointments + demographics only</div></div><div style="margin-left:auto;background:#f0fdf4;color:#16a34a;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px">Limited</div></div>
-        <div style="background:var(--grey-50);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:12.5px"><span>📱</span><div><div style="font-weight:600;color:var(--black)">Patient</div><div style="font-size:11px;color:var(--grey-400)">Own records + booking only</div></div><div style="margin-left:auto;background:#fffbeb;color:#d97706;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px">Read Only</div></div>
+        <div style="background:var(--grey-50);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:12.5px"><span class="material-icons" style="font-size:18px">medical_services</span><div><div style="font-weight:600;color:var(--black)">Doctor</div><div style="font-size:11px;color:var(--grey-400)">Full clinical + admin access</div></div><div style="margin-left:auto;background:var(--azure-dim);color:var(--azure);font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px">Full</div></div>
+        <div style="background:var(--grey-50);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:12.5px"><span class="material-icons" style="font-size:18px">folder_open</span><div><div style="font-weight:600;color:var(--black)">Receptionist</div><div style="font-size:11px;color:var(--grey-400)">Appointments + demographics only</div></div><div style="margin-left:auto;background:#f0fdf4;color:#16a34a;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px">Limited</div></div>
+        <div style="background:var(--grey-50);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:12.5px"><span class="material-icons" style="font-size:18px">smartphone</span><div><div style="font-weight:600;color:var(--black)">Patient</div><div style="font-size:11px;color:var(--grey-400)">Own records + booking only</div></div><div style="margin-left:auto;background:#fffbeb;color:#d97706;font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:20px">Read Only</div></div>
       </div>
     </div>
     <div class="bento-card bento-span-3 reveal reveal-delay-2">
-      <div class="bento-card-icon">🏠</div>
+      <div class="bento-card-icon"><span class="material-icons">home</span></div>
       <div class="bento-card-eyebrow">Patient Portal</div>
       <div class="bento-card-title">Patients see their own records</div>
       <div class="bento-card-body">Invite patients to their own secure mobile app. They can view records, sick notes, scripts and book appointments.</div>
       <div style="margin-top:16px">
-        <div class="mini-doc"><div class="mini-doc-icon">📄</div><div><div class="mini-doc-title">SN-2401</div><div class="mini-doc-sub">Sick Note · 15 Apr 2026</div></div></div>
-        <div class="mini-doc"><div class="mini-doc-icon">💊</div><div><div class="mini-doc-title">RX-3301</div><div class="mini-doc-sub">Prescription · 10 Apr 2026</div></div></div>
+        <div class="mini-doc"><div class="mini-doc-icon"><span class="material-icons">description</span></div><div><div class="mini-doc-title">SN-2401</div><div class="mini-doc-sub">Sick Note · 15 Apr 2026</div></div></div>
+        <div class="mini-doc"><div class="mini-doc-icon"><span class="material-icons">medication</span></div><div><div class="mini-doc-title">RX-3301</div><div class="mini-doc-sub">Prescription · 10 Apr 2026</div></div></div>
       </div>
     </div>
     <div class="bento-card bento-span-12 reveal">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center">
         <div>
-          <div class="bento-card-icon">📊</div>
+          <div class="bento-card-icon"><span class="material-icons">bar_chart</span></div>
           <div class="bento-card-eyebrow">Practice Intelligence</div>
           <div class="bento-card-title">See how your practice is performing</div>
           <div class="bento-card-body">Track patients across all doctors, appointment volumes, invoice totals, medical aid claims and document output — all in one practice dashboard.</div>
@@ -425,19 +432,19 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
   </div>
   <div class="persona-grid">
     <div class="persona-card reveal">
-      <div class="persona-emoji">🩺</div>
+      <div class="persona-emoji"><span class="material-icons">medical_services</span></div>
       <div class="persona-title">Solo GP</div>
       <div class="persona-desc">You see 20–40 patients a day and spend too much time on admin. MedConsult cuts paperwork so you can focus on what matters.</div>
       <ul class="persona-points"><li>Issue sick notes in under 30 seconds</li><li>Generate prescriptions with your signature instantly</li><li>Patients book themselves — no reception needed</li><li>Submit medical aid claims with one click</li><li>Start at R 299/month, cancel anytime</li></ul>
     </div>
     <div class="persona-card reveal reveal-delay-1">
-      <div class="persona-emoji">🏥</div>
+      <div class="persona-emoji"><span class="material-icons">local_hospital</span></div>
       <div class="persona-title">Group Practice</div>
       <div class="persona-desc">You manage multiple doctors, a reception desk and hundreds of patients. MedConsult gives everyone the right access to the right information.</div>
       <ul class="persona-points"><li>Unlimited doctors under one subscription</li><li>Receptionist portal with booking access only</li><li>Clinical records locked to treating doctor</li><li>Shared patient calendar across all doctors</li><li>Practice-wide reporting and billing</li></ul>
     </div>
     <div class="persona-card reveal reveal-delay-2">
-      <div class="persona-emoji">👩‍⚕️</div>
+      <div class="persona-emoji"><span class="material-icons">medical_services</span></div>
       <div class="persona-title">Specialist Practice</div>
       <div class="persona-desc">You receive referrals, run a tight schedule and bill at specialist rates. MedConsult handles the admin so you can focus on complex cases.</div>
       <ul class="persona-points"><li>Custom appointment durations per doctor</li><li>Specialist tariff code support for claims</li><li>Electronic referral tracking in records</li><li>Professional invoices with VAT at 15%</li><li>Patient portal for pre-consultation forms</li></ul>
@@ -585,9 +592,9 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       <button class="btn-hero-ghost" style="border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.6)" onclick="location.href='doctor.html'">Solo Doctor? Sign up here</button>
     </div>
     <div style="margin-top:32px;display:flex;gap:24px;justify-content:center;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:7px;font-size:13px;color:rgba(255,255,255,0.35)"><span>🔒</span> POPIA Compliant</div>
-      <div style="display:flex;align-items:center;gap:7px;font-size:13px;color:rgba(255,255,255,0.35)"><span>🇿🇦</span> South African servers</div>
-      <div style="display:flex;align-items:center;gap:7px;font-size:13px;color:rgba(255,255,255,0.35)"><span>💳</span> No card needed to start</div>
+      <div style="display:flex;align-items:center;gap:7px;font-size:13px;color:rgba(255,255,255,0.35)"><span class="material-icons" style="font-size:16px">lock</span> POPIA Compliant</div>
+      <div style="display:flex;align-items:center;gap:7px;font-size:13px;color:rgba(255,255,255,0.35)"><span class="material-icons" style="font-size:16px">public</span> South African servers</div>
+      <div style="display:flex;align-items:center;gap:7px;font-size:13px;color:rgba(255,255,255,0.35)"><span class="material-icons" style="font-size:16px">credit_card</span> No card needed to start</div>
     </div>
   </div>
 </div>
@@ -597,7 +604,7 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
   <div class="footer-inner">
     <div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-        <div style="width:28px;height:28px;background:var(--azure);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px">🩺</div>
+        <div style="width:28px;height:28px;background:var(--azure);border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px"><span class="material-icons" style="font-size:16px;color:#fff">medical_services</span></div>
         <div class="footer-brand-name">MedConsult</div>
       </div>
       <p class="footer-brand-desc">The complete practice management platform for South African doctors. Built in South Africa, for South Africa.</p>
@@ -618,9 +625,9 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       <div class="footer-col-title">Resources</div>
       <ul class="footer-links">
         <li><a href="#">Help Centre</a></li>
-        <li><a href="#">POPIA Policy</a></li>
-        <li><a href="#">Privacy Policy</a></li>
-        <li><a href="#">Terms of Service</a></li>
+        <li><a href="privacy.html" target="_blank" rel="noopener">POPIA Policy</a></li>
+        <li><a href="privacy.html" target="_blank" rel="noopener">Privacy Policy</a></li>
+        <li><a href="terms.html" target="_blank" rel="noopener">Terms of Service</a></li>
         <li><a href="#">HPCSA Guidelines</a></li>
       </ul>
     </div>
@@ -637,9 +644,9 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
   <div class="footer-bottom">
     <div>© 2026 MedConsult (Pty) Ltd. All rights reserved. Registered in South Africa.</div>
     <div style="display:flex;gap:20px">
-      <a href="#" style="color:var(--grey-600);font-size:12.5px;transition:color .2s" onmouseover="this.style.color='white'" onmouseout="this.style.color=''">Privacy</a>
-      <a href="#" style="color:var(--grey-600);font-size:12.5px;transition:color .2s" onmouseover="this.style.color='white'" onmouseout="this.style.color=''">Terms</a>
-      <a href="#" style="color:var(--grey-600);font-size:12.5px;transition:color .2s" onmouseover="this.style.color='white'" onmouseout="this.style.color=''">POPIA</a>
+      <a href="privacy.html" target="_blank" rel="noopener" style="color:var(--grey-600);font-size:12.5px;transition:color .2s" onmouseover="this.style.color='white'" onmouseout="this.style.color=''">Privacy</a>
+      <a href="terms.html" target="_blank" rel="noopener" style="color:var(--grey-600);font-size:12.5px;transition:color .2s" onmouseover="this.style.color='white'" onmouseout="this.style.color=''">Terms</a>
+      <a href="privacy.html" target="_blank" rel="noopener" style="color:var(--grey-600);font-size:12.5px;transition:color .2s" onmouseover="this.style.color='white'" onmouseout="this.style.color=''">POPIA</a>
     </div>
   </div>
 </footer>
@@ -651,25 +658,25 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
     <p class="portal-subheading reveal">Direct access to every part of the MedConsult platform.</p>
     <div class="portal-grid">
       <div class="portal-card reveal reveal-delay-1">
-        <div class="portal-card-icon">🩺</div>
+        <div class="portal-card-icon"><span class="material-icons">medical_services</span></div>
         <div class="portal-card-label">Doctor</div>
         <p class="portal-card-sub">Access your patient portal, appointments, clinical records and prescriptions.</p>
         <button class="btn-portal-azure" onclick="location.href='doctor.html'">Sign In as Doctor</button>
       </div>
       <div class="portal-card reveal reveal-delay-2">
-        <div class="portal-card-icon">🏥</div>
+        <div class="portal-card-icon"><span class="material-icons">local_hospital</span></div>
         <div class="portal-card-label">Practice Admin</div>
         <p class="portal-card-sub">Manage your practice, team members, billing and subscription settings.</p>
         <button class="btn-portal-ghost" onclick="location.href='practice.html'">Practice Dashboard</button>
       </div>
       <div class="portal-card reveal reveal-delay-3">
-        <div class="portal-card-icon">🗂️</div>
+        <div class="portal-card-icon"><span class="material-icons">folder_open</span></div>
         <div class="portal-card-label">Receptionist</div>
         <p class="portal-card-sub">Handle appointments, front desk operations and patient check-ins.</p>
         <button class="btn-portal-ghost" onclick="location.href='reception.html'">Reception Portal</button>
       </div>
       <div class="portal-card reveal" style="transition-delay:0.4s">
-        <div class="portal-card-icon">📱</div>
+        <div class="portal-card-icon"><span class="material-icons">smartphone</span></div>
         <div class="portal-card-label">Patient</div>
         <p class="portal-card-sub">View your records, upcoming appointments and book new consultations.</p>
         <button class="btn-portal-ghost" onclick="location.href='patient.html'">Open Patient App</button>
