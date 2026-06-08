@@ -417,11 +417,13 @@ body {
   </div>
   <!-- REGISTER -->
   <div class="auth-panel" id="panel-register">
+    <div class="field"><label>First Name</label><input type="text" id="r-fname" placeholder="Jane" autocomplete="given-name"></div>
+    <div class="field"><label>Last Name</label><input type="text" id="r-lname" placeholder="Doe" autocomplete="family-name"></div>
     <div class="field"><label>Email</label><input type="email" id="r-email" placeholder="your@email.com" autocomplete="email"></div>
     <div class="field"><label>Password</label><input type="password" id="r-pw" placeholder="Min 8 characters" autocomplete="new-password"></div>
     <div class="field"><label>Confirm Password</label><input type="password" id="r-pw2" placeholder="Repeat password" autocomplete="new-password"></div>
     <button class="btn-primary" id="reg-btn" onclick="doRegister()">Create Account</button>
-    <p class="auth-note">You need an invite link from your doctor to register.</p>
+    <p class="auth-note">Already have an invite link from your doctor? Open it directly to link your account automatically.</p>
   </div>
 </div>
 
@@ -568,6 +570,8 @@ async function validateToken(token) {
   if (new Date(data.expires_at) < new Date()) { toast('This invite link has expired', 'error'); return; }
   invitePatientId = data.patient_id;
   if (data.email) document.getElementById('r-email').value = data.email;
+  document.getElementById('r-fname').closest('.field').style.display = 'none';
+  document.getElementById('r-lname').closest('.field').style.display = 'none';
 }
 
 async function doLogin() {
@@ -584,19 +588,30 @@ async function doLogin() {
 }
 
 async function doRegister() {
+  const fname = document.getElementById('r-fname').value.trim();
+  const lname = document.getElementById('r-lname').value.trim();
   const email = document.getElementById('r-email').value.trim();
   const pw    = document.getElementById('r-pw').value;
   const pw2   = document.getElementById('r-pw2').value;
+  if (!invitePatientId && (!fname || !lname)) { toast('Please enter your first and last name', 'error'); return; }
   if (!email || !pw)    { toast('Please fill all fields', 'error'); return; }
   if (pw.length < 8)    { toast('Password must be at least 8 characters', 'error'); return; }
   if (pw !== pw2)       { toast('Passwords do not match', 'error'); return; }
-  if (!invitePatientId) { toast('A valid doctor invite link is required to register', 'error'); return; }
   setBtn('reg-btn', 'Creating account…', true);
   const { data, error } = await sb.auth.signUp({ email, password: pw });
+  if (error) { setBtn('reg-btn', 'Create Account', false); toast(error.message, 'error'); return; }
+  let patientId = invitePatientId;
+  if (patientId) {
+    await sb.from('patient_invites').update({ status: 'accepted' }).eq('token', inviteToken);
+  } else {
+    const { data: pat, error: patErr } = await sb.from('patients')
+      .insert({ first_name: fname, last_name: lname, email, doctor_id: null })
+      .select('id').single();
+    if (patErr) { setBtn('reg-btn', 'Create Account', false); toast(patErr.message, 'error'); return; }
+    patientId = pat.id;
+  }
+  await sb.from('patient_accounts').insert({ auth_id: data.user.id, patient_id: patientId });
   setBtn('reg-btn', 'Create Account', false);
-  if (error) { toast(error.message, 'error'); return; }
-  await sb.from('patient_accounts').insert({ auth_id: data.user.id, patient_id: invitePatientId });
-  await sb.from('patient_invites').update({ status: 'accepted' }).eq('token', inviteToken);
   await loadPatient(data.user);
   document.getElementById('auth-screen').style.display = 'none';
   bootApp();
