@@ -571,6 +571,14 @@ body {
   </div>
 </div>
 
+<!-- LINK DOCTOR SHEET -->
+<div class="sheet-overlay" id="link-doctor-overlay" onclick="linkDrOverlayTap(event)">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div id="link-doctor-body"></div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -582,10 +590,11 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ── STATE ────────────────────────────────────────────
-const ST = { user: null, account: null, patient: null };
+const ST = { user: null, account: null, patient: null, doctor: null };
 let inviteToken = null;
 let invitePatientId = null;
 let bkStep = 1, bkDate = null, bkSlot = null, bkDoctorId = null;
+let drSearchTimer = null, drResults = [], selectedDr = null;
 
 // ── BOOT ─────────────────────────────────────────────
 (async () => {
@@ -700,7 +709,11 @@ async function loadPatient(user) {
   ST.account = acct;
   const { data: pat } = await sb.from('patients').select('*').eq('id', acct.patient_id).single();
   ST.patient = pat;
-  if (pat?.doctor_id) bkDoctorId = pat.doctor_id;
+  if (pat?.doctor_id) {
+    bkDoctorId = pat.doctor_id;
+    const { data: dr } = await sb.from('doctors').select('fn, ln, spec').eq('id', pat.doctor_id).single();
+    ST.doctor = dr || null;
+  }
 }
 
 // ── TABS ─────────────────────────────────────────────
@@ -1020,10 +1033,18 @@ function buildPrescription(d) {
 }
 
 // ── PROFILE ──────────────────────────────────────────
-function renderProfile() {
+async function renderProfile() {
   const el  = document.getElementById('profile-body');
   const pat = ST.patient;
   if (!pat) { el.innerHTML = empty('person','Profile not found','Contact your doctor to link your account'); return; }
+
+  // Fetch doctor if linked but not yet cached or potentially changed
+  if (pat.doctor_id && !ST.doctor) {
+    const { data } = await sb.from('doctors').select('fn, ln, spec').eq('id', pat.doctor_id).single();
+    ST.doctor = data || null;
+  }
+  const dr = pat.doctor_id ? ST.doctor : null;
+
   const ini = `${(pat.fn||'?')[0]}${(pat.ln||'?')[0]}`.toUpperCase();
   el.innerHTML = `
     <div class="profile-hero">
@@ -1032,6 +1053,22 @@ function renderProfile() {
         <div class="profile-name">${esc(pat.fn)} ${esc(pat.ln)}</div>
         <div class="profile-em">${esc(pat.em || ST.user?.email || '')}</div>
       </div>
+    </div>
+    <div class="info-block">
+      <div class="info-title">My Doctor</div>
+      ${dr
+        ? `<div class="info-row" style="align-items:center">
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:600;color:var(--ink)">Dr. ${esc(dr.fn)} ${esc(dr.ln)}</div>
+              ${dr.spec ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(dr.spec)}</div>` : ''}
+            </div>
+            <button onclick="openLinkDoctor()" class="doc-view-btn">Change</button>
+          </div>`
+        : `<div class="info-row" style="align-items:center">
+            <div style="flex:1;font-size:13px;color:var(--ink2)">No doctor linked yet</div>
+            <button onclick="openLinkDoctor()" class="doc-view-btn" style="background:var(--azure);color:#fff">+ Link Doctor</button>
+          </div>`
+      }
     </div>
     <div class="info-block">
       <div class="info-title">Personal Details</div>
@@ -1065,6 +1102,107 @@ function renderProfile() {
 }
 function infoRow(k, v) {
   return `<div class="info-row"><div class="info-key">${k}</div><div class="info-val">${esc(String(v))}</div></div>`;
+}
+
+// ── LINK DOCTOR ───────────────────────────────────────
+function openLinkDoctor() {
+  renderLinkDoctorSheet();
+  document.getElementById('link-doctor-overlay').classList.add('open');
+}
+function closeLinkDoctor() {
+  document.getElementById('link-doctor-overlay').classList.remove('open');
+}
+function linkDrOverlayTap(e) {
+  if (e.target === document.getElementById('link-doctor-overlay')) closeLinkDoctor();
+}
+
+function renderLinkDoctorSheet() {
+  document.getElementById('link-doctor-body').innerHTML = `
+    <div class="sheet-title">Authorise a Doctor</div>
+    <div class="sheet-sub">Search for your doctor to grant them access to your records</div>
+    <div class="field" style="margin-top:4px">
+      <label>Search by name</label>
+      <input type="text" id="dr-search" placeholder="e.g. Mokoena, Smith…"
+             oninput="debouncedDrSearch()" autocomplete="off">
+    </div>
+    <div id="dr-results" style="min-height:60px">
+      <div style="font-size:13px;color:var(--ink3);padding:4px 0">Start typing to find your doctor</div>
+    </div>
+    <button class="btn-ghost" style="margin-top:16px" onclick="closeLinkDoctor()">Cancel</button>`;
+  setTimeout(() => document.getElementById('dr-search')?.focus(), 80);
+}
+
+function debouncedDrSearch() {
+  clearTimeout(drSearchTimer);
+  drSearchTimer = setTimeout(async () => {
+    const q   = (document.getElementById('dr-search')?.value || '').trim();
+    const el  = document.getElementById('dr-results');
+    if (!el) return;
+    if (q.length < 2) {
+      el.innerHTML = '<div style="font-size:13px;color:var(--ink3);padding:4px 0">Type at least 2 characters</div>';
+      return;
+    }
+    el.innerHTML = spinner();
+    const { data, error } = await sb.from('doctors')
+      .select('id, fn, ln, spec')
+      .or(`fn.ilike.%${q}%,ln.ilike.%${q}%`)
+      .limit(8);
+    if (error || !data || !data.length) {
+      el.innerHTML = `<div style="font-size:13px;color:var(--ink2);padding:4px 0">No doctors found for "<strong>${esc(q)}</strong>"</div>`;
+      drResults = [];
+      return;
+    }
+    drResults = data;
+    el.innerHTML = data.map((d, i) => `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:600;color:var(--ink)">Dr. ${esc(d.fn)} ${esc(d.ln)}</div>
+          ${d.spec ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(d.spec)}</div>` : ''}
+        </div>
+        <button class="doc-view-btn" onclick="showDrConfirm(${i})">Select</button>
+      </div>`).join('');
+  }, 380);
+}
+
+function showDrConfirm(i) {
+  selectedDr = drResults[i];
+  if (!selectedDr) return;
+  const d = selectedDr;
+  document.getElementById('link-doctor-body').innerHTML = `
+    <div class="sheet-title">Confirm Authorisation</div>
+    <div class="sheet-sub">This doctor will be able to view and manage your medical records</div>
+    <div class="card" style="margin:20px 0;display:flex;align-items:center;gap:14px">
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--azure);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0">${esc((d.fn||'D')[0])}${esc((d.ln||'')[0])}</div>
+      <div>
+        <div style="font-size:16px;font-weight:700;color:var(--ink)">Dr. ${esc(d.fn)} ${esc(d.ln)}</div>
+        ${d.spec ? `<div style="font-size:12px;color:var(--ink2);margin-top:3px">${esc(d.spec)}</div>` : ''}
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--ink2);line-height:1.65;margin-bottom:20px">
+      By confirming, you authorise Dr. ${esc(d.fn)} ${esc(d.ln)} to view your medical records,
+      add consultation notes, and manage your appointments on MedConsult.
+    </p>
+    <button class="btn-primary" id="confirm-link-btn" onclick="confirmLinkDoctor()">Confirm &amp; Authorise</button>
+    <button class="btn-ghost" style="margin-top:10px" onclick="renderLinkDoctorSheet()">← Back to search</button>`;
+}
+
+async function confirmLinkDoctor() {
+  if (!selectedDr) return;
+  setBtn('confirm-link-btn', 'Authorising…', true);
+  const { error } = await sb.from('patients')
+    .update({ doctor_id: selectedDr.id })
+    .eq('id', ST.account.patient_id);
+  if (error) {
+    setBtn('confirm-link-btn', 'Confirm & Authorise', false);
+    toast(error.message, 'error');
+    return;
+  }
+  ST.patient.doctor_id = selectedDr.id;
+  ST.doctor = { fn: selectedDr.fn, ln: selectedDr.ln, spec: selectedDr.spec };
+  bkDoctorId = selectedDr.id;
+  closeLinkDoctor();
+  toast(`Dr. ${selectedDr.fn} ${selectedDr.ln} authorised`, 'success');
+  renderProfile();
 }
 
 // ── HELPERS ──────────────────────────────────────────
