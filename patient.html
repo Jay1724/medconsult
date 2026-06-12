@@ -11,6 +11,7 @@
 <title>MedConsult — Patient Portal</title>
 <link rel="manifest" href="manifest.json">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root {
@@ -384,6 +385,61 @@ body {
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.success { background: var(--success); }
 .toast.error   { background: var(--danger); }
+
+/* ── MATERIAL ICONS ── */
+.nav-btn .material-icons  { font-size: 22px; line-height: 1; margin-bottom: 3px; display: block; }
+.qa-icon .material-icons  { font-size: 26px; }
+.empty-icon .material-icons { font-size: 44px; color: var(--ink3); }
+.next-card-type .material-icons { font-size: 14px; vertical-align: middle; }
+
+/* ── APP SHELL BASE ── */
+.app-nav  { display: none; }
+.app-main { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+
+/* ── DESKTOP ── */
+@media (min-width: 768px) {
+  #root { max-width: 100%; }
+
+  #auth-screen { align-items: center; justify-content: center; }
+  .auth-card {
+    background: var(--surface); border-radius: var(--radius);
+    box-shadow: var(--shadow-md); padding: 48px 52px;
+    width: 100%; max-width: 460px;
+  }
+
+  #app-screen { flex-direction: row; height: 100vh; overflow: hidden; min-height: unset; }
+
+  .app-nav {
+    display: flex; flex-direction: column;
+    width: 240px; min-width: 240px; flex-shrink: 0;
+    background: var(--surface); border-right: 1px solid var(--border);
+    height: 100vh; position: sticky; top: 0;
+  }
+  .app-nav-brand {
+    padding: 28px 24px 20px; font-size: 20px; font-weight: 700;
+    color: var(--azure); border-bottom: 1px solid var(--border);
+    flex-shrink: 0; letter-spacing: -0.3px;
+  }
+  .app-nav-items { flex: 1; padding: 12px 8px; overflow-y: auto; }
+  .app-nav .nav-btn {
+    width: 100%; flex-direction: row; align-items: center;
+    gap: 12px; padding: 11px 14px; border-radius: var(--radius-sm);
+    margin-bottom: 2px; justify-content: flex-start;
+  }
+  .app-nav .nav-btn .material-icons { font-size: 20px; margin-bottom: 0; flex-shrink: 0; }
+  .app-nav .nav-btn.active   { background: var(--azure-dim); color: var(--azure); }
+  .app-nav .nav-btn:not(.active):hover { background: var(--surface2); }
+  .app-nav .nav-label { font-size: 14px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+
+  .app-main { flex: 1; overflow: hidden; min-width: 0; }
+  .app-header { padding-left: 28px; padding-right: 28px; flex-shrink: 0; }
+  .tab-content { flex: 1; overflow-y: auto; padding: 20px 28px 40px; }
+  .bottom-nav { display: none; }
+  .toast { bottom: 24px; }
+
+  .sheet { border-radius: var(--radius); max-width: 540px; }
+  .sheet-overlay.open { align-items: center; }
+}
 </style>
 </head>
 <body>
@@ -398,6 +454,7 @@ body {
 
 <!-- AUTH -->
 <div id="auth-screen">
+  <div class="auth-card">
   <div class="auth-brand">
     <div class="auth-logo">MedConsult</div>
     <div class="auth-tagline">Your health, at your fingertips</div>
@@ -425,71 +482,84 @@ body {
     <button class="btn-primary" id="reg-btn" onclick="doRegister()">Create Account</button>
     <p class="auth-note">Already have an invite link from your doctor? Open it directly to link your account automatically.</p>
   </div>
+  </div><!-- .auth-card -->
 </div>
 
 <!-- APP -->
 <div id="app-screen">
-  <div class="app-header">
-    <div class="app-header-title" id="hdr-title">Home</div>
-    <div class="app-header-sub" id="hdr-sub"></div>
-  </div>
-  <div class="tab-content">
-    <!-- HOME -->
-    <div class="tab-panel active" id="tab-home">
-      <div class="greeting-hi" id="home-greeting">Hello</div>
-      <div class="greeting-date" id="home-date"></div>
-      <div id="next-appt-wrap"></div>
-      <div class="qa-grid">
-        <button class="qa-btn" onclick="switchTab('appointments');setTimeout(openBooking,120)">
-          <span class="qa-icon">📅</span>
-          <span class="qa-label">Book</span>
-          <span class="qa-sub">New appointment</span>
-        </button>
-        <button class="qa-btn" onclick="switchTab('records')">
-          <span class="qa-icon">📋</span>
-          <span class="qa-label">Records</span>
-          <span class="qa-sub">Medical history</span>
-        </button>
-        <button class="qa-btn" onclick="switchTab('documents')">
-          <span class="qa-icon">📄</span>
-          <span class="qa-label">Documents</span>
-          <span class="qa-sub">Sick notes & scripts</span>
-        </button>
-        <button class="qa-btn" onclick="switchTab('profile')">
-          <span class="qa-icon">👤</span>
-          <span class="qa-label">Profile</span>
-          <span class="qa-sub">Your details</span>
-        </button>
+  <nav class="app-nav">
+    <div class="app-nav-brand">MedConsult</div>
+    <div class="app-nav-items">
+      <button class="nav-btn active" data-tab="home" onclick="switchTab('home')"><span class="material-icons">home</span><span class="nav-label">Home</span></button>
+      <button class="nav-btn" data-tab="appointments" onclick="switchTab('appointments')"><span class="material-icons">calendar_today</span><span class="nav-label">Appointments</span></button>
+      <button class="nav-btn" data-tab="records" onclick="switchTab('records')"><span class="material-icons">assignment</span><span class="nav-label">Records</span></button>
+      <button class="nav-btn" data-tab="documents" onclick="switchTab('documents')"><span class="material-icons">description</span><span class="nav-label">Documents</span></button>
+      <button class="nav-btn" data-tab="profile" onclick="switchTab('profile')"><span class="material-icons">person</span><span class="nav-label">Profile</span></button>
+    </div>
+  </nav>
+  <div class="app-main">
+    <div class="app-header">
+      <div class="app-header-title" id="hdr-title">Home</div>
+      <div class="app-header-sub" id="hdr-sub"></div>
+    </div>
+    <div class="tab-content">
+      <!-- HOME -->
+      <div class="tab-panel active" id="tab-home">
+        <div class="greeting-hi" id="home-greeting">Hello</div>
+        <div class="greeting-date" id="home-date"></div>
+        <div id="next-appt-wrap"></div>
+        <div class="qa-grid">
+          <button class="qa-btn" onclick="switchTab('appointments');setTimeout(openBooking,120)">
+            <span class="qa-icon"><span class="material-icons">calendar_today</span></span>
+            <span class="qa-label">Book</span>
+            <span class="qa-sub">New appointment</span>
+          </button>
+          <button class="qa-btn" onclick="switchTab('records')">
+            <span class="qa-icon"><span class="material-icons">assignment</span></span>
+            <span class="qa-label">Records</span>
+            <span class="qa-sub">Medical history</span>
+          </button>
+          <button class="qa-btn" onclick="switchTab('documents')">
+            <span class="qa-icon"><span class="material-icons">description</span></span>
+            <span class="qa-label">Documents</span>
+            <span class="qa-sub">Sick notes &amp; scripts</span>
+          </button>
+          <button class="qa-btn" onclick="switchTab('profile')">
+            <span class="qa-icon"><span class="material-icons">person</span></span>
+            <span class="qa-label">Profile</span>
+            <span class="qa-sub">Your details</span>
+          </button>
+        </div>
       </div>
-    </div>
-    <!-- APPOINTMENTS -->
-    <div class="tab-panel" id="tab-appointments">
-      <button class="btn-primary" style="margin-bottom:16px" onclick="openBooking()">+ Book New Appointment</button>
-      <div id="appts-body"></div>
-    </div>
-    <!-- RECORDS -->
-    <div class="tab-panel" id="tab-records">
-      <div id="records-body"></div>
-    </div>
-    <!-- DOCUMENTS -->
-    <div class="tab-panel" id="tab-documents">
-      <div class="section-hd">Sick Notes</div>
-      <div id="docs-sn"></div>
-      <div class="section-hd">Prescriptions</div>
-      <div id="docs-rx"></div>
-    </div>
-    <!-- PROFILE -->
-    <div class="tab-panel" id="tab-profile">
-      <div id="profile-body"></div>
-      <button class="btn-ghost" style="margin-top:8px" onclick="doLogout()">Log out</button>
+      <!-- APPOINTMENTS -->
+      <div class="tab-panel" id="tab-appointments">
+        <button class="btn-primary" style="margin-bottom:16px" onclick="openBooking()">+ Book New Appointment</button>
+        <div id="appts-body"></div>
+      </div>
+      <!-- RECORDS -->
+      <div class="tab-panel" id="tab-records">
+        <div id="records-body"></div>
+      </div>
+      <!-- DOCUMENTS -->
+      <div class="tab-panel" id="tab-documents">
+        <div class="section-hd">Sick Notes</div>
+        <div id="docs-sn"></div>
+        <div class="section-hd">Prescriptions</div>
+        <div id="docs-rx"></div>
+      </div>
+      <!-- PROFILE -->
+      <div class="tab-panel" id="tab-profile">
+        <div id="profile-body"></div>
+        <button class="btn-ghost" style="margin-top:8px" onclick="doLogout()">Log out</button>
+      </div>
     </div>
   </div>
   <nav class="bottom-nav">
-    <button class="nav-btn active" data-tab="home" onclick="switchTab('home')"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></button>
-    <button class="nav-btn" data-tab="appointments" onclick="switchTab('appointments')"><span class="nav-icon">📅</span><span class="nav-label">Appts</span></button>
-    <button class="nav-btn" data-tab="records" onclick="switchTab('records')"><span class="nav-icon">📋</span><span class="nav-label">Records</span></button>
-    <button class="nav-btn" data-tab="documents" onclick="switchTab('documents')"><span class="nav-icon">📄</span><span class="nav-label">Docs</span></button>
-    <button class="nav-btn" data-tab="profile" onclick="switchTab('profile')"><span class="nav-icon">👤</span><span class="nav-label">Profile</span></button>
+    <button class="nav-btn active" data-tab="home" onclick="switchTab('home')"><span class="material-icons">home</span><span class="nav-label">Home</span></button>
+    <button class="nav-btn" data-tab="appointments" onclick="switchTab('appointments')"><span class="material-icons">calendar_today</span><span class="nav-label">Appts</span></button>
+    <button class="nav-btn" data-tab="records" onclick="switchTab('records')"><span class="material-icons">assignment</span><span class="nav-label">Records</span></button>
+    <button class="nav-btn" data-tab="documents" onclick="switchTab('documents')"><span class="material-icons">description</span><span class="nav-label">Docs</span></button>
+    <button class="nav-btn" data-tab="profile" onclick="switchTab('profile')"><span class="material-icons">person</span><span class="nav-label">Profile</span></button>
   </nav>
 </div>
 
@@ -548,7 +618,6 @@ function bootApp() {
   hideLoader();
   const app = document.getElementById('app-screen');
   app.style.display = 'flex';
-  app.style.flexDirection = 'column';
   renderHome();
 }
 
@@ -646,7 +715,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
-  document.querySelector(`.nav-btn[data-tab="${tab}"]`).classList.add('active');
+  document.querySelectorAll(`.nav-btn[data-tab="${tab}"]`).forEach(b => b.classList.add('active'));
   const [t, s] = HDR[tab] || [tab, ''];
   document.getElementById('hdr-title').textContent = t;
   document.getElementById('hdr-sub').textContent   = s;
@@ -692,7 +761,7 @@ async function loadNextAppt() {
 
 function noApptCard() {
   return `<div class="card" style="text-align:center;padding:24px 16px;margin-bottom:12px">
-    <div style="font-size:28px;margin-bottom:8px">📅</div>
+    <span class="material-icons" style="font-size:36px;color:var(--ink3);display:block;margin-bottom:8px">calendar_today</span>
     <div style="font-size:14px;font-weight:600;color:var(--ink)">No upcoming appointments</div>
     <div style="font-size:12px;color:var(--ink2);margin-top:4px">Tap Book below to schedule one</div>
   </div>`;
@@ -701,7 +770,7 @@ function noApptCard() {
 // ── APPOINTMENTS ─────────────────────────────────────
 async function loadAppointments() {
   const el = document.getElementById('appts-body');
-  if (!ST.account) { el.innerHTML = empty('📅','No appointments','Book one using the button above'); return; }
+  if (!ST.account) { el.innerHTML = empty('calendar_today','No appointments','Book one using the button above'); return; }
   el.innerHTML = spinner();
   const today = isoDate(new Date());
   const { data } = await sb.from('appointments')
@@ -709,7 +778,7 @@ async function loadAppointments() {
     .eq('patient_id', ST.account.patient_id)
     .order('appt_date', { ascending: false })
     .order('appt_time', { ascending: false });
-  if (!data || !data.length) { el.innerHTML = empty('📅','No appointments yet','Use the button above to book'); return; }
+  if (!data || !data.length) { el.innerHTML = empty('calendar_today','No appointments yet','Use the button above to book'); return; }
   const upcoming = data.filter(a => a.appt_date >= today && !['Cancelled','Completed','No Show'].includes(a.status));
   const past     = data.filter(a => a.appt_date <  today || ['Cancelled','Completed','No Show'].includes(a.status));
   let html = '';
@@ -719,7 +788,7 @@ async function loadAppointments() {
   if (past.length) {
     html += `<div class="section-hd">Past</div>` + past.slice(0,10).map(a => apptCard(a, true)).join('');
   }
-  el.innerHTML = html || empty('📅','No appointments yet','Use the button above to book');
+  el.innerHTML = html || empty('calendar_today','No appointments yet','Use the button above to book');
 }
 
 function apptCard(a, past=false) {
@@ -788,7 +857,7 @@ async function loadSlots() {
   const { data, error } = await sb.rpc('get_available_slots', { p_doctor_id: bkDoctorId, p_date: bkDate });
   const el = document.getElementById('slots-area');
   if (error || !data || !data.length) {
-    el.innerHTML = empty('⏰','No available slots','The doctor has no openings on this day — try another date');
+    el.innerHTML = empty('schedule','No available slots','The doctor has no openings on this day — try another date');
     return;
   }
   el.innerHTML = `<div class="slots-grid">${data.map(s => {
@@ -832,14 +901,14 @@ async function confirmBooking() {
 // ── RECORDS ──────────────────────────────────────────
 async function loadRecords() {
   const el = document.getElementById('records-body');
-  if (!ST.account) { el.innerHTML = empty('📋','No records','Your doctor will add records after consultations'); return; }
+  if (!ST.account) { el.innerHTML = empty('assignment','No records','Your doctor will add records after consultations'); return; }
   el.innerHTML = spinner();
   const { data } = await sb.from('records')
     .select('*')
     .eq('patient_id', ST.account.patient_id)
     .order('date', { ascending: false });
   if (!data || !data.length) {
-    el.innerHTML = empty('📋','No medical records yet','Your doctor will add records after your consultations');
+    el.innerHTML = empty('assignment','No medical records yet','Your doctor will add records after your consultations');
     return;
   }
   el.innerHTML = data.map((r, i) => `
@@ -875,10 +944,10 @@ async function loadDocuments() {
   ]);
   document.getElementById('docs-sn').innerHTML =
     (sns && sns.length) ? sns.map(d => docCard(d, 'sick_note')).join('') :
-    empty('📄','No sick notes','Sick notes from your doctor will appear here');
+    empty('description','No sick notes','Sick notes from your doctor will appear here');
   document.getElementById('docs-rx').innerHTML =
     (rxs && rxs.length) ? rxs.map(d => docCard(d, 'prescription')).join('') :
-    empty('💊','No prescriptions','Prescriptions from your doctor will appear here');
+    empty('medication','No prescriptions','Prescriptions from your doctor will appear here');
 }
 
 function docCard(d, type) {
@@ -954,7 +1023,7 @@ function buildPrescription(d) {
 function renderProfile() {
   const el  = document.getElementById('profile-body');
   const pat = ST.patient;
-  if (!pat) { el.innerHTML = empty('👤','Profile not found','Contact your doctor to link your account'); return; }
+  if (!pat) { el.innerHTML = empty('person','Profile not found','Contact your doctor to link your account'); return; }
   const ini = `${(pat.fn||'?')[0]}${(pat.ln||'?')[0]}`.toUpperCase();
   el.innerHTML = `
     <div class="profile-hero">
@@ -1007,9 +1076,12 @@ function fmtDate(ds) {
 }
 function isoDate(d) { return d.toISOString().split('T')[0]; }
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function typeIcon(t) { if (!t) return '🏥'; if (t.includes('Video')) return '📹'; if (t.includes('Phone')) return '📞'; if (t.includes('Follow')) return '🔄'; return '🏥'; }
+function typeIcon(t) {
+  const n = !t ? 'local_hospital' : t.includes('Video') ? 'videocam' : t.includes('Phone') ? 'phone' : t.includes('Follow') ? 'update' : 'local_hospital';
+  return `<span class="material-icons" style="font-size:14px;vertical-align:middle">${n}</span>`;
+}
 function empty(icon, title, sub) {
-  return `<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-title">${title}</div>${sub?`<div class="empty-sub">${sub}</div>`:''}</div>`;
+  return `<div class="empty"><div class="empty-icon"><span class="material-icons">${icon}</span></div><div class="empty-title">${title}</div>${sub?`<div class="empty-sub">${sub}</div>`:''}</div>`;
 }
 function spinner() { return `<div class="spinner"></div>`; }
 function setBtn(id, label, disabled) { const b = document.getElementById(id); b.textContent = label; b.disabled = disabled; }
