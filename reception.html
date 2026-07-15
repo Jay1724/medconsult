@@ -265,6 +265,31 @@ tr:hover td{background:var(--grey-50)}
 .avail-day-off{padding:12px 8px;text-align:center;font-size:11px;color:var(--ink3)}
 .avail-day-on{padding:8px;text-align:center;font-size:12px;color:var(--ink);font-weight:500}
 
+/* ── CLAIMS ──────────────────────────────────────────────── */
+.claims-filter-bar{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.claims-filter-btn{padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--ink2);cursor:pointer;transition:.15s}
+.claims-filter-btn.active{background:var(--azure);color:var(--white);border-color:var(--azure)}
+.claims-filter-btn:hover:not(.active){background:var(--grey-50)}
+.claim-lines-head{display:grid;grid-template-columns:110px 1fr 64px 110px 36px;gap:8px;padding:8px 12px;background:var(--grey-50);border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.3px}
+.claim-line-row{display:grid;grid-template-columns:110px 1fr 64px 110px 36px;gap:8px;padding:6px 12px;border-bottom:1px solid var(--grey-100);align-items:center}
+.claim-line-row:last-child{border-bottom:none}
+.claim-line-input{width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;font-size:13px;color:var(--ink);background:var(--surface);transition:.2s;outline:none}
+.claim-line-input:focus{border-color:var(--azure);box-shadow:0 0 0 2px var(--azure-dim)}
+.claim-line-input.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+.claim-line-remove{background:none;color:var(--ink3);font-size:18px;padding:4px 6px;border-radius:4px;cursor:pointer;transition:.15s;line-height:1;border:none;display:flex;align-items:center;justify-content:center}
+.claim-line-remove:hover{color:var(--danger);background:var(--danger-bg)}
+.claim-total-row{display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:10px 12px;border-top:2px solid var(--border);background:var(--grey-50)}
+.claim-total-label{font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.3px}
+.claim-total-value{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--ink)}
+.claim-pat-wrap{position:relative}
+.claim-pat-results{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);position:absolute;top:100%;left:0;right:0;z-index:200;max-height:200px;overflow-y:auto;display:none}
+.claim-pat-results.open{display:block}
+.claim-pat-item{padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--grey-100);font-size:13px}
+.claim-pat-item:hover{background:var(--grey-50)}
+.claim-pat-item:last-child{border-bottom:none}
+.claim-pat-item strong{display:block;color:var(--ink)}
+.claim-pat-item span{font-size:11px;color:var(--ink2)}
+
 /* ── PATIENT SEARCH RESULTS ──────────────────────────────── */
 .pat-search-result{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow-md);position:absolute;top:100%;left:0;right:0;z-index:200;max-height:240px;overflow-y:auto;display:none}
 .pat-search-result.open{display:block}
@@ -360,6 +385,7 @@ tr:hover td{background:var(--grey-50)}
       <div class="nav-item" onclick="nav('appointments',this)" id="ni-appointments"><span class="nav-icon">📅</span> Appointments</div>
       <div class="nav-item" onclick="nav('patients',this)" id="ni-patients"><span class="nav-icon">👤</span> Patients</div>
       <div class="nav-item" onclick="nav('doctors',this)" id="ni-doctors"><span class="nav-icon">🩺</span> Doctors</div>
+      <div class="nav-item" onclick="nav('claims',this)" id="ni-claims"><span class="nav-icon">🧾</span> Claims</div>
     </nav>
     <div class="sb-footer">
       <div class="sb-user">
@@ -453,6 +479,28 @@ tr:hover td{background:var(--grey-50)}
         <div id="doc-detail" style="display:none">
           <button class="btn btn-secondary btn-sm" onclick="backToDoctors()" style="margin-bottom:16px">← Back to Doctors</button>
           <div id="doc-detail-inner"></div>
+        </div>
+      </div>
+
+      <!-- CLAIMS -->
+      <div class="page" id="pg-claims">
+        <div class="page-header" style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <h1>Claims</h1>
+            <p>Medical aid billing — draft, review and mark claims ready for submission</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openClaimBuilder(null)" style="flex-shrink:0;margin-top:4px">+ New Claim</button>
+        </div>
+        <div class="claims-filter-bar">
+          <span style="font-size:12px;font-weight:600;color:var(--ink2)">Filter:</span>
+          <button class="claims-filter-btn active" onclick="filterClaims('')">All</button>
+          <button class="claims-filter-btn" onclick="filterClaims('draft')">Draft</button>
+          <button class="claims-filter-btn" onclick="filterClaims('ready')">Ready</button>
+          <button class="claims-filter-btn" onclick="filterClaims('submitted')">Submitted</button>
+          <button class="claims-filter-btn" onclick="filterClaims('paid')">Paid</button>
+        </div>
+        <div id="claims-list-wrap">
+          <div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div>
         </div>
       </div>
 
@@ -612,6 +660,18 @@ tr:hover td{background:var(--grey-50)}
   </div>
 </div>
 
+<!-- CLAIM BUILDER MODAL -->
+<div class="modal-overlay" id="modal-claim">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-head">
+      <h2 id="claim-modal-title">New Claim</h2>
+      <button class="modal-close" onclick="closeClaimBuilder()">×</button>
+    </div>
+    <div class="modal-body" id="claim-modal-body"></div>
+    <div class="modal-foot" id="claim-modal-foot"></div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
@@ -623,6 +683,17 @@ let weekOffset = 0;
 let calSelectedDay = null;
 let editingApptId = null;
 let allPatients = [];
+
+// Claims state
+let claimsCache = [];
+let claimLines = [];
+let claimApptId = null;
+let claimFilter = '';
+let currentClaimId = null;
+let claimIsReadOnly = false;
+let claimPatResults = [];
+let claimPatientId = null;
+let claimDoctorId = null;
 
 /* ── HELPERS ───────────────────────────────────────────────── */
 function esc(s){ const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
@@ -650,6 +721,13 @@ function toast(msg, type='info'){
   setTimeout(()=>t.remove(),4000);
 }
 
+function setBtn(id, text, disabled){
+  const btn=document.getElementById(id);
+  if(!btn) return;
+  btn.textContent=text;
+  btn.disabled=disabled;
+}
+
 /* ── CLOCK ─────────────────────────────────────────────────── */
 function tickClock(){
   const now=new Date();
@@ -663,7 +741,7 @@ function openSidebar(){ document.getElementById('sidebar').classList.add('open')
 function closeSidebar(){ document.getElementById('sidebar').classList.remove('open'); document.getElementById('sb-overlay').classList.remove('open'); }
 
 /* ── NAV ────────────────────────────────────────────────────── */
-const PAGE_TITLES = { dashboard:'Dashboard', appointments:'Appointments', patients:'Patients', doctors:'Doctors' };
+const PAGE_TITLES = { dashboard:'Dashboard', appointments:'Appointments', patients:'Patients', doctors:'Doctors', claims:'Claims' };
 function nav(pg, el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
@@ -675,6 +753,7 @@ function nav(pg, el){
   if(pg==='appointments') loadCalendar();
   if(pg==='patients') loadPatients();
   if(pg==='doctors') loadDoctors();
+  if(pg==='claims') loadClaims();
 }
 
 /* ── AUTH ───────────────────────────────────────────────────── */
@@ -1056,8 +1135,10 @@ function renderApptDetail(a){
       <select id="detail-status">${STATUSES.map(s=>`<option value="${s}"${s===a.status?' selected':''}>${capitalise(s)}</option>`).join('')}</select>
     </div>`;
   const foot=document.getElementById('appt-detail-foot');
+  const canClaim=a.status==='completed'||a.status==='in_consultation';
   foot.innerHTML=`
     <button class="btn btn-danger btn-sm" onclick="cancelAppt('${a.id}')">Cancel Appointment</button>
+    ${canClaim?`<button class="btn btn-secondary btn-sm" onclick="openClaimBuilder('${a.id}')">🧾 Create Claim</button>`:''}
     <button class="btn btn-secondary" onclick="closeApptDetail()">Close</button>
     <button class="btn btn-primary" onclick="saveApptStatus('${a.id}')">Save Status</button>`;
   document.getElementById('modal-appt-detail').classList.add('open');
@@ -1212,10 +1293,362 @@ async function viewDoctor(id){
 }
 function backToDoctors(){ document.getElementById('doc-list').style.display='block'; document.getElementById('doc-detail').style.display='none'; }
 
+/* ── CLAIMS ─────────────────────────────────────────────────── */
+const TARIFF_CODES=[
+  {code:'0190',desc:'Initial consultation (standard)'},
+  {code:'0191',desc:'Follow-up consultation'},
+  {code:'0192',desc:'Extended consultation'},
+  {code:'0120',desc:'After-hours consultation'},
+  {code:'0148',desc:'Telephonic consultation'},
+  {code:'0052',desc:'Electrocardiogram (ECG)'},
+  {code:'0055',desc:'Blood pressure measurement'},
+  {code:'0030',desc:'Minor procedure'},
+];
+
+function claimStatusPill(st){
+  const map={draft:'pill-grey',ready:'pill-blue',submitted:'pill-yellow',paid:'pill-green',queried:'pill-yellow',rejected:'pill-red'};
+  return `<span class="pill ${map[st]||'pill-grey'}">${capitalise(st)}</span>`;
+}
+
+async function loadClaims(){
+  document.getElementById('claims-list-wrap').innerHTML='<div class="skel skel-row"></div><div class="skel skel-row"></div><div class="skel skel-row"></div>';
+  const {data,error}=await sb.from('claims')
+    .select('id,status,total_cents,icd10,created_at,patient_id,doctor_id,patients(first_name,last_name,medical_aid_provider),doctors(first_name,last_name),claim_lines(id)')
+    .order('created_at',{ascending:false});
+  if(error){toast(error.message,'error');return;}
+  claimsCache=data||[];
+  renderClaimsList();
+}
+
+function filterClaims(status){
+  claimFilter=status;
+  document.querySelectorAll('.claims-filter-btn').forEach(b=>{
+    const label=b.textContent.toLowerCase();
+    b.classList.toggle('active',label===(status||'all'));
+  });
+  renderClaimsList();
+}
+
+function renderClaimsList(){
+  const wrap=document.getElementById('claims-list-wrap');
+  const list=claimFilter?claimsCache.filter(c=>c.status===claimFilter):claimsCache;
+  if(!list.length){
+    wrap.innerHTML=`<div class="empty"><div class="empty-icon">🧾</div><div class="empty-title">No claims found</div><div class="empty-sub">Create a claim from a completed appointment or use + New Claim</div></div>`;
+    return;
+  }
+  wrap.innerHTML=`<div class="tbl-wrap"><table>
+    <thead><tr><th>Patient</th><th>Medical Aid</th><th>Lines</th><th>Total</th><th>Status</th><th>Created</th></tr></thead>
+    <tbody>${list.map(c=>`<tr class="tbl-clickable" onclick="openExistingClaim('${c.id}')">
+      <td><strong>${esc((c.patients?.first_name||'')+' '+(c.patients?.last_name||''))}</strong><br>
+        <span style="font-size:11px;color:var(--ink3)">Dr. ${esc((c.doctors?.first_name||'')+' '+(c.doctors?.last_name||''))}</span></td>
+      <td>${c.patients?.medical_aid_provider?`<span class="pill pill-blue">${esc(c.patients.medical_aid_provider)}</span>`:'<span class="pill pill-grey">Self-pay</span>'}</td>
+      <td style="font-family:'JetBrains Mono',monospace;text-align:center">${(c.claim_lines||[]).length}</td>
+      <td style="font-family:'JetBrains Mono',monospace">R ${((c.total_cents||0)/100).toFixed(2)}</td>
+      <td>${claimStatusPill(c.status)}</td>
+      <td style="color:var(--ink2);font-size:12px">${fmtDate((c.created_at||'').slice(0,10))}</td>
+    </tr>`).join('')}</tbody>
+  </table></div>`;
+}
+
+async function openClaimBuilder(apptId){
+  claimApptId=apptId;
+  currentClaimId=null;
+  claimIsReadOnly=false;
+  claimPatientId=null;
+  claimDoctorId=null;
+  claimLines=[{tariff_code:'',description:'',quantity:1,unit_cents:0}];
+  document.getElementById('claim-modal-title').textContent='New Claim';
+
+  let patName='',aidInfo='',icd='',docObj=null;
+
+  if(apptId){
+    const {data:appt}=await sb.from('appointments')
+      .select('patient_id,doctor_id,patients(first_name,last_name,medical_aid_provider,medical_aid_number,medical_aid_plan),doctors(first_name,last_name)')
+      .eq('id',apptId).single();
+    if(appt){
+      claimPatientId=appt.patient_id;
+      claimDoctorId=appt.doctor_id;
+      patName=`${appt.patients?.first_name||''} ${appt.patients?.last_name||''}`.trim();
+      if(appt.patients?.medical_aid_provider){
+        aidInfo=appt.patients.medical_aid_provider+(appt.patients.medical_aid_number?' · '+appt.patients.medical_aid_number:'');
+      }
+      docObj=appt.doctors;
+      // Pre-fill ICD from most recent record
+      const {data:rec}=await sb.from('records')
+        .select('icd').eq('patient_id',claimPatientId)
+        .order('date',{ascending:false}).limit(1).maybeSingle();
+      if(rec?.icd) icd=rec.icd;
+    }
+    closeApptDetail();
+  }
+
+  renderClaimForm({patName,aidInfo,icd,docObj});
+  document.getElementById('modal-claim').classList.add('open');
+}
+
+async function openExistingClaim(id){
+  const {data:claim,error}=await sb.from('claims')
+    .select('*,patients(first_name,last_name,medical_aid_provider,medical_aid_number),doctors(first_name,last_name),claim_lines(*)')
+    .eq('id',id).single();
+  if(error||!claim){toast('Claim not found','error');return;}
+  currentClaimId=id;
+  claimIsReadOnly=claim.status!=='draft';
+  claimPatientId=claim.patient_id;
+  claimDoctorId=claim.doctor_id;
+  claimLines=(claim.claim_lines||[]).map(l=>({id:l.id,tariff_code:l.tariff_code,description:l.description||'',quantity:l.quantity,unit_cents:l.unit_cents}));
+  if(!claimLines.length) claimLines=[{tariff_code:'',description:'',quantity:1,unit_cents:0}];
+  document.getElementById('claim-modal-title').textContent=claimIsReadOnly?'View Claim':'Edit Claim';
+  const patName=`${claim.patients?.first_name||''} ${claim.patients?.last_name||''}`.trim();
+  const aidInfo=claim.patients?.medical_aid_provider?(claim.patients.medical_aid_provider+(claim.patients.medical_aid_number?' · '+claim.patients.medical_aid_number:'')):'';
+  renderClaimForm({patName,aidInfo,icd:claim.icd10||'',notes:claim.notes||'',status:claim.status,docObj:claim.doctors,existingClaim:claim});
+  document.getElementById('modal-claim').classList.add('open');
+}
+
+function closeClaimBuilder(){
+  document.getElementById('modal-claim').classList.remove('open');
+  claimLines=[];
+  currentClaimId=null;
+  claimPatientId=null;
+  claimDoctorId=null;
+  claimApptId=null;
+}
+
+function renderClaimForm({patName='',aidInfo='',icd='',notes='',status='draft',docObj=null,existingClaim=null}={}){
+  const ro=claimIsReadOnly;
+  const docLabel=docObj?`Dr. ${docObj.first_name||''} ${docObj.last_name||''}`.trim():'';
+
+  document.getElementById('claim-modal-body').innerHTML=`
+    ${ro?`<div style="background:var(--warning-bg);border:1px solid var(--warning);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;color:var(--warning);margin-bottom:16px;font-weight:600">
+      This claim is <strong>${capitalise(status)}</strong> and cannot be edited.</div>`:''}
+
+    ${!claimPatientId?`
+    <div class="form-field claim-pat-wrap">
+      <label>Patient</label>
+      <input type="text" id="claim-pat-search" placeholder="Search patient name…" oninput="searchClaimPatient(this.value)" autocomplete="off"${ro?' disabled':''}>
+      <div class="claim-pat-results" id="claim-pat-results"></div>
+    </div>`:`
+    <div style="background:var(--grey-50);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div style="font-weight:600;font-size:14px;color:var(--ink)">${esc(patName)}</div>
+        ${aidInfo?`<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(aidInfo)}</div>`:`<div style="font-size:12px;color:var(--ink3);margin-top:2px">No medical aid on file</div>`}
+        ${docLabel?`<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(docLabel)}</div>`:''}
+      </div>
+      ${!currentClaimId&&!ro?`<button class="btn btn-secondary btn-sm" onclick="clearClaimPatient()">Change</button>`:''}
+    </div>`}
+
+    <div class="form-row">
+      <div class="form-field">
+        <label>ICD-10 Code</label>
+        <input type="text" id="claim-icd" value="${esc(icd)}" placeholder="e.g. J45.0" maxlength="10"${ro?' disabled':''}>
+      </div>
+      <div class="form-field">
+        <label>Status</label>
+        <select id="claim-status"${ro?' disabled':''}>
+          <option value="draft"${status==='draft'?' selected':''}>Draft</option>
+          <option value="ready"${status==='ready'?' selected':''}>Ready to Submit</option>
+          ${status==='submitted'?'<option value="submitted" selected>Submitted</option>':''}
+          ${status==='paid'?'<option value="paid" selected>Paid</option>':''}
+          ${status==='queried'?'<option value="queried" selected>Queried</option>':''}
+          ${status==='rejected'?'<option value="rejected" selected>Rejected</option>':''}
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-bottom:8px">
+      <div style="font-size:12px;font-weight:600;color:var(--ink2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px">Billing Lines</div>
+      <div style="border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+        <div class="claim-lines-head">
+          <span>Tariff Code</span><span>Description</span><span>Qty</span><span>Amount (R)</span><span></span>
+        </div>
+        <div id="claim-lines-body"></div>
+      </div>
+      ${!ro?`<button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addClaimLine()">+ Add Line</button>`:''}
+    </div>
+
+    <div class="claim-total-row">
+      <span class="claim-total-label">Total</span>
+      <span class="claim-total-value" id="claim-total">R 0.00</span>
+    </div>
+
+    <div class="form-field" style="margin-top:16px">
+      <label>Notes (optional)</label>
+      <textarea id="claim-notes" placeholder="Billing notes, e.g. after-hours, multiple procedures…"${ro?' disabled':''}>${esc(notes)}</textarea>
+    </div>`;
+
+  renderClaimLines();
+
+  const foot=document.getElementById('claim-modal-foot');
+  if(ro){
+    foot.innerHTML=`<button class="btn btn-secondary" onclick="closeClaimBuilder()">Close</button>`;
+  } else {
+    foot.innerHTML=`
+      <button class="btn btn-secondary" onclick="closeClaimBuilder()">Cancel</button>
+      <button class="btn btn-secondary" id="claim-save-btn" onclick="saveClaim('draft')">Save Draft</button>
+      <button class="btn btn-primary" id="claim-ready-btn" onclick="saveClaim('ready')" style="background:var(--success)">Mark Ready</button>`;
+  }
+}
+
+// Datalist is injected once into the DOM on first use
+function ensureTariffDatalist(){
+  if(document.getElementById('tariff-list')) return;
+  const dl=document.createElement('datalist');
+  dl.id='tariff-list';
+  dl.innerHTML=TARIFF_CODES.map(t=>`<option value="${t.code}">${t.desc}</option>`).join('');
+  document.body.appendChild(dl);
+}
+
+function renderClaimLines(){
+  const body=document.getElementById('claim-lines-body');
+  if(!body) return;
+  ensureTariffDatalist();
+  const ro=claimIsReadOnly;
+  body.innerHTML=claimLines.map((line,i)=>`
+    <div class="claim-line-row">
+      <input class="claim-line-input mono" list="tariff-list" value="${esc(line.tariff_code)}" placeholder="0190"
+        ${ro?'disabled':''} oninput="updateClaimLine(${i},'tariff_code',this.value);autoFillDesc(${i},this.value)">
+      <input class="claim-line-input" value="${esc(line.description)}" placeholder="Description"
+        ${ro?'disabled':''} oninput="updateClaimLine(${i},'description',this.value)">
+      <input class="claim-line-input mono" type="number" min="1" max="99" value="${line.quantity}"
+        ${ro?'disabled':''} oninput="updateClaimLine(${i},'quantity',Math.max(1,parseInt(this.value)||1))">
+      <input class="claim-line-input mono" type="number" min="0" step="0.01" value="${(line.unit_cents/100).toFixed(2)}"
+        ${ro?'disabled':''} oninput="updateClaimLine(${i},'unit_cents',Math.round((parseFloat(this.value)||0)*100))">
+      ${ro?'<span></span>':`<button class="claim-line-remove" onclick="removeClaimLine(${i})" title="Remove">×</button>`}
+    </div>`).join('');
+  updateClaimTotal();
+}
+
+function autoFillDesc(i,code){
+  const match=TARIFF_CODES.find(t=>t.code===code.trim());
+  if(!match||claimLines[i].description) return;
+  claimLines[i].description=match.desc;
+  const rows=document.querySelectorAll('#claim-lines-body .claim-line-row');
+  if(rows[i]){
+    const inp=rows[i].querySelectorAll('input')[1];
+    if(inp&&!inp.value) inp.value=match.desc;
+  }
+}
+
+function addClaimLine(){
+  claimLines.push({tariff_code:'',description:'',quantity:1,unit_cents:0});
+  renderClaimLines();
+}
+
+function removeClaimLine(i){
+  if(claimLines.length<=1){claimLines[0]={tariff_code:'',description:'',quantity:1,unit_cents:0};renderClaimLines();return;}
+  claimLines.splice(i,1);
+  renderClaimLines();
+}
+
+function updateClaimLine(i,field,value){
+  claimLines[i][field]=value;
+  if(field==='quantity'||field==='unit_cents') updateClaimTotal();
+}
+
+function updateClaimTotal(){
+  const total=claimLines.reduce((sum,l)=>sum+(l.unit_cents*(l.quantity||1)),0);
+  const el=document.getElementById('claim-total');
+  if(el) el.textContent=`R ${(total/100).toFixed(2)}`;
+}
+
+async function saveClaim(statusOverride){
+  if(!claimPatientId){toast('Please select a patient','error');return;}
+  const lines=claimLines.filter(l=>l.tariff_code.trim());
+  if(!lines.length){toast('Add at least one billing line with a tariff code','error');return;}
+  const icd=(document.getElementById('claim-icd')?.value||'').trim();
+  const notes=(document.getElementById('claim-notes')?.value||'').trim();
+  const status=statusOverride||document.getElementById('claim-status')?.value||'draft';
+  const totalCents=lines.reduce((sum,l)=>sum+(l.unit_cents*(l.quantity||1)),0);
+
+  setBtn('claim-save-btn','Saving…',true);
+  setBtn('claim-ready-btn','Saving…',true);
+
+  const payload={
+    patient_id:claimPatientId,
+    doctor_id:claimDoctorId||null,
+    appointment_id:claimApptId||null,
+    icd10:icd||null,
+    notes:notes||null,
+    status,
+    total_cents:totalCents,
+  };
+
+  let claimId=currentClaimId;
+  let saveError;
+  if(claimId){
+    ({error:saveError}=await sb.from('claims').update(payload).eq('id',claimId));
+  } else {
+    const {data:newClaim,error:insErr}=await sb.from('claims').insert(payload).select('id').single();
+    saveError=insErr;
+    if(newClaim) claimId=newClaim.id;
+  }
+
+  if(saveError){
+    toast(saveError.message,'error');
+    setBtn('claim-save-btn','Save Draft',false);
+    setBtn('claim-ready-btn','Mark Ready',false);
+    return;
+  }
+
+  // Delete old lines then re-insert
+  if(claimId){
+    await sb.from('claim_lines').delete().eq('claim_id',claimId);
+    const lineRows=lines.map(l=>({
+      claim_id:claimId,
+      tariff_code:l.tariff_code.trim(),
+      description:l.description.trim()||null,
+      quantity:l.quantity||1,
+      unit_cents:l.unit_cents||0,
+    }));
+    const {error:lineErr}=await sb.from('claim_lines').insert(lineRows);
+    if(lineErr) toast('Claim saved but line items failed: '+lineErr.message,'warning');
+  }
+
+  setBtn('claim-save-btn','Save Draft',false);
+  setBtn('claim-ready-btn','Mark Ready',false);
+  toast(status==='ready'?'Claim marked ready to submit':'Claim saved as draft','success');
+  closeClaimBuilder();
+  if(document.getElementById('pg-claims').classList.contains('active')) loadClaims();
+}
+
+function searchClaimPatient(val){
+  const res=document.getElementById('claim-pat-results');
+  if(!val||val.length<2){res.classList.remove('open');return;}
+  const matches=allPatients.filter(p=>`${p.first_name} ${p.last_name}`.toLowerCase().includes(val.toLowerCase())).slice(0,8);
+  if(!matches.length){res.classList.remove('open');return;}
+  claimPatResults=matches;
+  res.innerHTML=matches.map((p,i)=>`
+    <div class="claim-pat-item" onclick="selectClaimPatient(${i})">
+      <strong>${esc(p.first_name+' '+p.last_name)}</strong>
+      <span>${esc(p.medical_aid_provider?p.medical_aid_provider+(p.medical_aid_number?' · '+p.medical_aid_number:''):(p.phone||p.email||'Self-pay'))}</span>
+    </div>`).join('');
+  res.classList.add('open');
+}
+
+function selectClaimPatient(i){
+  const p=claimPatResults[i];
+  if(!p) return;
+  claimPatientId=p.id;
+  claimDoctorId=p.doctor_id||null;
+  const docObj=claimDoctorId?R.doctors.find(d=>d.id===claimDoctorId):null;
+  const aidInfo=p.medical_aid_provider?(p.medical_aid_provider+(p.medical_aid_number?' · '+p.medical_aid_number:'')):'';
+  const savedIcd=(document.getElementById('claim-icd')?.value||'').trim();
+  const savedNotes=(document.getElementById('claim-notes')?.value||'').trim();
+  renderClaimForm({patName:`${p.first_name} ${p.last_name}`,aidInfo,docObj,icd:savedIcd,notes:savedNotes});
+}
+
+function clearClaimPatient(){
+  claimPatientId=null;
+  claimDoctorId=null;
+  renderClaimForm({});
+}
+
 /* ── CLOSE DROPDOWN ON OUTSIDE CLICK ────────────────────────── */
 document.addEventListener('click', e=>{
   if(!e.target.closest('#bk-pat-search')&&!e.target.closest('#bk-pat-results'))
     document.getElementById('bk-pat-results').classList.remove('open');
+  const cpRes=document.getElementById('claim-pat-results');
+  if(cpRes&&!e.target.closest('#claim-pat-search')&&!e.target.closest('#claim-pat-results'))
+    cpRes.classList.remove('open');
 });
 </script>
 </body>
