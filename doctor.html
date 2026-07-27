@@ -1244,7 +1244,7 @@ const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 //  APP STATE
 // ══════════════════════════════════════════════════
 const S = {
-  doc: null, plan: 'pro',
+  doc: null, plan: 'pro', doctorId: null,
   patients: [], records: [], invoices: [], claims: [], sickNotes: [], scripts: [],
   iNum: 1001, cNum: 5001,
   snRef: 2400, rxRef: 3300,
@@ -1415,7 +1415,7 @@ function launchApp() {
   document.getElementById('sb-plan').textContent=S.plan==='pro'?'PRO':'STARTER';
   const h=new Date().getHours();const greeting=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
   document.getElementById('pg-title').textContent=`${greeting}, ${d.fn}`;
-  popSelects(); renderDash(); initSigs(); renderSub();
+  initSigs(); renderSub(); loadFromSupabase();
 }
 
 async function doLogout() {
@@ -1479,8 +1479,8 @@ async function acceptDoctorInvite() {
   const user = data.user;
   // Insert doctor record
   const { data: doc } = await sbClient.from('doctors').insert({
-    auth_id: user.id, first_name: fn, last_name: ln, specialization: spec,
-    hpcsa_number: hpcsa, practice_id: INVITE_DATA.practice_id
+    auth_id: user.id, fn, ln, spec,
+    hpcsa, practice_id: INVITE_DATA.practice_id
   }).select().single();
   // Add to practice_members
   await sbClient.from('practice_members').insert({
@@ -1516,6 +1516,43 @@ async function acceptDoctorInvite() {
 })();
 
 // ══════════════════════════════════════════════════
+//  SUPABASE DATA LOADING
+// ══════════════════════════════════════════════════
+function stringToColor(s){const c=['#2563eb','#7c3aed','#d97706','#be185d','#0891b2','#16a34a','#9333ea','#c2410c'];let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))&0xffffffff;return c[Math.abs(h)%c.length];}
+
+async function loadFromSupabase(){
+  const {data:{user}}=await sbClient.auth.getUser();
+  if(!user)return;
+  const {data:docRow}=await sbClient.from('doctors').select('id').eq('auth_id',user.id).maybeSingle();
+  if(docRow){S.doctorId=docRow.id;calDoctorId=docRow.id;}
+  await loadPatientsFromDB();
+  await Promise.all([loadSNsFromDB(),loadRXsFromDB()]);
+  renderDash();popSelects();
+}
+
+async function loadPatientsFromDB(){
+  if(!S.doctorId)return;
+  const {data}=await sbClient.from('patients').select('*').eq('doctor_id',S.doctorId).order('ln');
+  if(!data)return;
+  S.patients=data.map(p=>({id:p.id,fn:p.fn||'',ln:p.ln||'',dob:p.dob||'',idnum:p.idnum||'',gen:p.gen||'',bl:p.bl||'',ph:p.ph||'',wa:p.wa||'',em:p.em||'',addr:p.addr||'',aid:p.aid||'',aidnum:p.aidnum||'',aidplan:p.aidplan||'',principal:p.principal||'',allerg:p.allerg||'',chronic:p.chronic||'',emer:p.emer||'',col:stringToColor((p.fn||'')+(p.ln||''))}));
+  const el=document.getElementById('s-patients');if(el)el.textContent=S.patients.length;
+}
+
+async function loadSNsFromDB(){
+  if(!S.patients.length)return;
+  const ids=S.patients.map(p=>p.id);
+  const {data}=await sbClient.from('sick_notes').select('*').in('patient_id',ids).order('date',{ascending:false});
+  S.sickNotes=(data||[]).map(s=>({id:s.id,ref:'SN-'+s.id.slice(0,6).toUpperCase(),pid:s.patient_id,date:s.date,from:s.from,to:s.to,diag:s.diag,icd:s.icd||'',inst:s.inst||'',sigImg:''}));
+}
+
+async function loadRXsFromDB(){
+  if(!S.patients.length)return;
+  const ids=S.patients.map(p=>p.id);
+  const {data}=await sbClient.from('prescriptions').select('*').in('patient_id',ids).order('date',{ascending:false});
+  S.scripts=(data||[]).map(r=>({id:r.id,ref:'RX-'+r.id.slice(0,6).toUpperCase(),pid:r.patient_id,date:r.date,diag:r.diag||'',rep:'0',meds:Array.isArray(r.medications)?r.medications:[],sigImg:''}));
+}
+
+// ══════════════════════════════════════════════════
 //  NAVIGATION
 // ══════════════════════════════════════════════════
 function nav(pg, el) {
@@ -1528,9 +1565,9 @@ function nav(pg, el) {
   else document.getElementById('pg-title').textContent=titles[pg]||pg;
   if(pg==='dashboard')renderDash();
   if(pg==='calendar')loadCalendar();
-  if(pg==='patients')renderPats();
-  if(pg==='sicknotes'){popSelects();renderSNs();}
-  if(pg==='scripts'){popSelects();renderRXs();}
+  if(pg==='patients'){loadPatientsFromDB().then(()=>renderPats());}
+  if(pg==='sicknotes'){popSelects();loadSNsFromDB().then(()=>renderSNs());}
+  if(pg==='scripts'){popSelects();loadRXsFromDB().then(()=>renderRXs());}
   if(pg==='invoices')renderInvs();
   if(pg==='claims')renderClaims();
   if(pg==='consultations')renderConsult();
@@ -1564,14 +1601,16 @@ function popSelects(){
 // ══════════════════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════════════════
-function renderDash(){
+async function renderDash(){
   document.getElementById('s-patients').textContent=S.patients.length;
   document.getElementById('s-invoices').textContent=S.invoices.filter(i=>i.status==='Pending').length;
   document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
   document.getElementById('d-date').textContent=new Date().toLocaleDateString('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-  const sched=[{t:'08:30',n:'Thabo Mokoena',s:'In-Person · Hypertension',pid:'p1',k:'inperson'},{t:'10:00',n:'Sarah van der Berg',s:'Video · Asthma Review',pid:'p2',k:'video'},{t:'11:30',n:'Mohammed Hassan',s:'In-Person · Diabetes',pid:'p3',k:'inperson'},{t:'14:00',n:'Liesel Pretorius',s:'Video · General Consult',pid:'p4',k:'video'}];
-  document.getElementById('d-schedule').innerHTML=sched.map(s=>`<div class="appt-row" onclick="openDetail('${s.pid}')"><div class="appt-time">${s.t}</div><div class="appt-dot" style="background:${s.k==='video'?'var(--azure)':'var(--success)'}"></div><div class="appt-info"><div class="appt-name">${s.n}</div><div class="appt-type">${s.s}</div></div><span class="pill ${s.k==='video'?'pill-blue':'pill-green'}" style="font-size:10px">${s.k==='video'?'📹 Video':'🏥 In-Person'}</span></div>`).join('');
   document.getElementById('d-recent').innerHTML=S.patients.slice().reverse().slice(0,4).map(p=>`<div class="appt-row" onclick="openDetail('${p.id}')"><div class="mini-av" style="background:${p.col}">${ini(p)}</div><div class="appt-info"><div class="appt-name">${fn(p)}</div><div class="appt-type">${p.aid||'Private'} · ${p.chronic||'No chronic conditions'}</div></div></div>`).join('');
+  if(!S.doctorId){document.getElementById('d-schedule').innerHTML='<div style="text-align:center;padding:40px;color:var(--ink2)">No appointments today</div>';return;}
+  const {data:appts}=await sbClient.from('appointments').select('id,appt_time,type,status,reason,patient_id').eq('doctor_id',S.doctorId).eq('appt_date',td()).order('appt_time');
+  const rows=appts||[];
+  document.getElementById('d-schedule').innerHTML=rows.length?rows.map(a=>{const p=gp(a.patient_id);const name=p?fn(p):'Patient';const k=a.type==='Video Call'?'video':'inperson';return`<div class="appt-row"${p?` onclick="openDetail('${a.patient_id}')"`:''}><div class="appt-time">${a.appt_time.slice(0,5)}</div><div class="appt-dot" style="background:${k==='video'?'var(--azure)':'var(--success)'}"></div><div class="appt-info"><div class="appt-name">${name}</div><div class="appt-type">${a.type}${a.reason?' · '+a.reason:''}</div></div><span class="pill ${k==='video'?'pill-blue':'pill-green'}" style="font-size:10px">${k==='video'?'📹 Video':'🏥 In-Person'}</span></div>`;}).join(''):'<div style="text-align:center;padding:40px;color:var(--ink2)">No appointments today</div>';
 }
 
 // ══════════════════════════════════════════════════
@@ -1588,11 +1627,23 @@ function filterPats(v){renderPats(v)}
 function globalSearch(v){if(v.length>1){renderPats(v);nav('patients',document.querySelector('[onclick*=patients]'));}}
 function showAddPatient(){editPID=null;document.getElementById('m-patient-title').textContent='Add New Patient';['fn','ln','id','ph','wa','em','aidnum','aidplan','principal','allerg','chronic','emer'].forEach(f=>{const el=document.getElementById('p-'+f);if(el)el.value=''});document.getElementById('p-dob').value='';document.getElementById('p-addr').value='';document.getElementById('p-aid').value='';document.getElementById('p-gen').value='Female';document.getElementById('p-bl').value='';openM('m-patient');}
 function editPat(id){const p=gp(id);editPID=id;document.getElementById('m-patient-title').textContent='Edit Patient';['fn','ln','dob','idnum','gen','bl','ph','wa','em'].forEach(k=>{const el=document.getElementById('p-'+k.replace('idnum','id').replace('gen','gen').replace('bl','bl'));if(el)el.value=p[k]||p[k.replace('fn','fn').replace('ln','ln')]||''});document.getElementById('p-fn').value=p.fn;document.getElementById('p-ln').value=p.ln;document.getElementById('p-dob').value=p.dob||'';document.getElementById('p-id').value=p.idnum||'';document.getElementById('p-gen').value=p.gen||'Female';document.getElementById('p-bl').value=p.bl||'';document.getElementById('p-ph').value=p.ph||'';document.getElementById('p-wa').value=p.wa||'';document.getElementById('p-em').value=p.em||'';document.getElementById('p-addr').value=p.addr||'';document.getElementById('p-aid').value=p.aid||'';document.getElementById('p-aidnum').value=p.aidnum||'';document.getElementById('p-aidplan').value=p.aidplan||'';document.getElementById('p-principal').value=p.principal||'';document.getElementById('p-allerg').value=p.allerg||'';document.getElementById('p-chronic').value=p.chronic||'';document.getElementById('p-emer').value=p.emer||'';openM('m-patient');}
-function savePat(){
+async function savePat(){
   const fn2=document.getElementById('p-fn').value.trim(),ln2=document.getElementById('p-ln').value.trim();
   if(!fn2||!ln2){toast('Enter first and last name','error');return}
-  const d={fn:fn2,ln:ln2,dob:document.getElementById('p-dob').value,idnum:document.getElementById('p-id').value.trim(),gen:document.getElementById('p-gen').value,bl:document.getElementById('p-bl').value,ph:document.getElementById('p-ph').value.trim(),wa:document.getElementById('p-wa').value.trim()||document.getElementById('p-ph').value.trim(),em:document.getElementById('p-em').value.trim(),addr:document.getElementById('p-addr').value.trim(),aid:document.getElementById('p-aid').value,aidnum:document.getElementById('p-aidnum').value.trim(),aidplan:document.getElementById('p-aidplan').value.trim(),principal:document.getElementById('p-principal').value.trim(),allerg:document.getElementById('p-allerg').value.trim(),chronic:document.getElementById('p-chronic').value.trim(),emer:document.getElementById('p-emer').value.trim(),col:['#2563eb','#7c3aed','#d97706','#be185d','#0891b2','#16a34a'][Math.floor(Math.random()*6)]};
-  if(editPID){const i=S.patients.findIndex(p=>p.id===editPID);S.patients[i]={...S.patients[i],...d};toast('Patient updated','success');}else{d.id='p'+Date.now();S.patients.push(d);toast('Patient added','success');}
+  const d={fn:fn2,ln:ln2,dob:document.getElementById('p-dob').value||null,idnum:document.getElementById('p-id').value.trim()||null,gen:document.getElementById('p-gen').value,bl:document.getElementById('p-bl').value||null,ph:document.getElementById('p-ph').value.trim(),wa:document.getElementById('p-wa').value.trim()||document.getElementById('p-ph').value.trim(),em:document.getElementById('p-em').value.trim(),addr:document.getElementById('p-addr').value.trim()||null,aid:document.getElementById('p-aid').value||null,aidnum:document.getElementById('p-aidnum').value.trim()||null,aidplan:document.getElementById('p-aidplan').value.trim()||null,allerg:document.getElementById('p-allerg').value.trim()||null,chronic:document.getElementById('p-chronic').value.trim()||null,emer:document.getElementById('p-emer').value.trim()||null};
+  if(S.doctorId)d.doctor_id=S.doctorId;
+  const btn=document.querySelector('#m-patient .btn-primary');if(btn){btn.textContent='Saving…';btn.disabled=true;}
+  let ok=false;
+  if(editPID){
+    const {error}=await sbClient.from('patients').update(d).eq('id',editPID);
+    if(error){toast(error.message,'error');}else{ok=true;toast('Patient updated','success');}
+  }else{
+    const {error}=await sbClient.from('patients').insert(d);
+    if(error){toast(error.message,'error');}else{ok=true;toast('Patient added','success');}
+  }
+  if(btn){btn.textContent='Save Patient';btn.disabled=false;}
+  if(!ok)return;
+  await loadPatientsFromDB();
   closeM('m-patient');renderPats();popSelects();document.getElementById('s-patients').textContent=S.patients.length;
 }
 
@@ -1607,8 +1658,8 @@ function openDetail(id){
   document.getElementById('d-name').textContent=fn(p);
   document.getElementById('d-meta').textContent=`${p.gen} · ${p.dob} · ${p.aid||'Private Patient'}`;
   document.getElementById('d-info').innerHTML=[['ID Number',p.idnum||'—'],['Blood Type',p.bl||'—'],['Phone',p.ph],['WhatsApp',p.wa||p.ph],['Email',p.em],['Address',p.addr||'—'],['Medical Aid',p.aid||'None'],['Aid Number',p.aidnum||'—'],['Plan',p.aidplan||'—'],['Principal',p.principal||'Self'],['Allergies',p.allerg||'None known'],['Chronic',p.chronic||'None'],['Emergency',p.emer||'—']].map(([k,v])=>`<div class="info-cell"><div class="info-cell-label">${k}</div><div class="info-cell-value">${v}</div></div>`).join('');
-  const recs=S.records.filter(r=>r.pid===id);
-  document.getElementById('d-recs').innerHTML=recs.length?recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="rec-item"><div class="rec-date">${r.date} · ${r.type}</div><div class="rec-title">${r.diag} <span class="pill pill-blue" style="font-size:10px">${r.icd}</span></div><div class="rec-notes">${r.notes}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records yet</div>';
+  document.getElementById('d-recs').innerHTML='<div style="text-align:center;padding:32px;color:var(--ink2)">Loading records…</div>';
+  sbClient.from('records').select('*').eq('patient_id',id).order('date',{ascending:false}).then(({data})=>{const recs=data||[];document.getElementById('d-recs').innerHTML=recs.length?recs.map(r=>`<div class="rec-item"><div class="rec-date">${r.date}</div><div class="rec-title">${r.diag} ${r.icd?`<span class="pill pill-blue" style="font-size:10px">${r.icd}</span>`:''}</div><div class="rec-notes">${r.notes||''}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records yet</div>';});
   const invs=S.invoices.filter(i=>i.pid===id);
   document.getElementById('d-invs').innerHTML=invs.length?invs.map(inv=>{const t=inv.lines.reduce((s,l)=>s+l.q*l.r,0)*1.15;return`<div class="rec-item" style="display:flex;align-items:center;gap:12px;cursor:pointer" onclick="previewInvById('${inv.id}')"><div style="flex:1"><div style="font-weight:600">${inv.num}</div><div style="font-size:11px;color:var(--ink2)">${inv.date}</div></div><div style="font-weight:600">${fc(t)}</div><span class="pill ${inv.status==='Paid'?'pill-green':'pill-yellow'}">${inv.status}</span></div>`}).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No invoices yet</div>';
   const sns=S.sickNotes.filter(s=>s.pid===id), rxs=S.scripts.filter(s=>s.pid===id);
@@ -1628,8 +1679,8 @@ function invForCur(){closeM('m-detail');showAddInvoice(curPID);}
 //  RECORDS
 // ══════════════════════════════════════════════════
 function showAddRecord(pre){popSelects();document.getElementById('r-date').value=td();['diag','icd','vit','notes','meds','ref'].forEach(f=>document.getElementById('r-'+f).value='');document.getElementById('r-fu').value='';if(pre)document.getElementById('r-pat').value=pre;openM('m-record');}
-function saveRec(){const pid=document.getElementById('r-pat').value,diag=document.getElementById('r-diag').value.trim();if(!pid||!diag){toast('Select patient and enter diagnosis','error');return}S.records.push({id:'r'+Date.now(),pid,date:document.getElementById('r-date').value,type:document.getElementById('r-type').value,diag,icd:document.getElementById('r-icd').value.trim(),vit:document.getElementById('r-vit').value.trim(),notes:document.getElementById('r-notes').value.trim(),meds:document.getElementById('r-meds').value.trim(),fu:document.getElementById('r-fu').value,ref:document.getElementById('r-ref').value.trim()});closeM('m-record');toast('Record saved','success');loadRecords(pid);}
-function loadRecords(pid){const el=document.getElementById('rec-display');if(!pid){el.innerHTML='';return}const recs=S.records.filter(r=>r.pid===pid);const p=gp(pid);el.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">Records — ${fn(p)}</div><button class="btn btn-primary btn-sm" onclick="showAddRecord('${pid}')">+ Add</button></div><div style="padding:16px">${recs.length?recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="rec-item"><div class="rec-date">${r.date} · ${r.type}</div><div class="rec-title">${r.diag} <span class="pill pill-blue" style="font-size:10px">${r.icd}</span></div>${r.vit?`<div style="font-size:11px;color:var(--ink2);margin-bottom:4px;font-family:'JetBrains Mono',monospace">Vitals: ${r.vit}</div>`:''}<div class="rec-notes">${r.notes}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records for this patient</div>'}</div></div>`;}
+async function saveRec(){const pid=document.getElementById('r-pat').value,diag=document.getElementById('r-diag').value.trim();if(!pid||!diag){toast('Select patient and enter diagnosis','error');return}const row={patient_id:pid,date:document.getElementById('r-date').value,diag,icd:document.getElementById('r-icd').value.trim()||null,vit:document.getElementById('r-vit').value.trim()||null,notes:document.getElementById('r-notes').value.trim()||null,meds:document.getElementById('r-meds').value.trim()||null,fu:document.getElementById('r-fu').value||null};const {error}=await sbClient.from('records').insert(row);if(error){toast(error.message,'error');return;}closeM('m-record');toast('Record saved','success');loadRecords(pid);}
+async function loadRecords(pid){const el=document.getElementById('rec-display');if(!pid){el.innerHTML='';return}const p=gp(pid);el.innerHTML='<div style="text-align:center;padding:32px;color:var(--ink2)">Loading…</div>';const {data:rows,error}=await sbClient.from('records').select('*').eq('patient_id',pid).order('date',{ascending:false});if(error){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--danger)">Failed to load records</div>';return;}const recs=rows||[];el.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">Records — ${fn(p)}</div><button class="btn btn-primary btn-sm" onclick="showAddRecord('${pid}')">+ Add</button></div><div style="padding:16px">${recs.length?recs.map(r=>`<div class="rec-item"><div class="rec-date">${r.date}</div><div class="rec-title">${r.diag} ${r.icd?`<span class="pill pill-blue" style="font-size:10px">${r.icd}</span>`:''}</div>${r.vit?`<div style="font-size:11px;color:var(--ink2);margin-bottom:4px;font-family:'JetBrains Mono',monospace">Vitals: ${r.vit}</div>`:''}<div class="rec-notes">${r.notes||''}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records for this patient</div>'}</div></div>`;}
 
 // ══════════════════════════════════════════════════
 //  SIGNATURE CANVASES
@@ -1706,12 +1757,15 @@ function snPrev(){
   const data={ref:'PREVIEW',patName:p?fn(p):'',patId:p?p.idnum:'',date:document.getElementById('sn-date').value,from:document.getElementById('sn-from').value,to:document.getElementById('sn-to').value,diag:document.getElementById('sn-diag').value,icd:document.getElementById('sn-icd').value,inst:document.getElementById('sn-inst').value,sigImg:getSig('sn')};
   document.getElementById('sn-preview').innerHTML=buildSNDoc(data);
 }
-function saveSN(){
+async function saveSN(){
   const pid=document.getElementById('sn-pat').value,diag=document.getElementById('sn-diag').value.trim();
   if(!pid||!diag){toast('Select patient and enter diagnosis','error');return}
-  const ref='SN-'+S.snRef++;
-  S.sickNotes.push({id:'sn'+Date.now(),ref,pid,date:document.getElementById('sn-date').value,from:document.getElementById('sn-from').value,to:document.getElementById('sn-to').value,diag,icd:document.getElementById('sn-icd').value.trim(),inst:document.getElementById('sn-inst').value.trim(),sigImg:getSig('sn')});
-  closeM('m-sn');toast(ref+' issued','success');renderSNs();document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
+  const p=gp(pid);
+  const row={patient_id:pid,doctor_name:S.doc.name,patient_name:p?fn(p):'',diag,icd:document.getElementById('sn-icd').value.trim()||null,date:document.getElementById('sn-date').value,'from':document.getElementById('sn-from').value,'to':document.getElementById('sn-to').value,inst:document.getElementById('sn-inst').value.trim()||null};
+  const {data:saved,error}=await sbClient.from('sick_notes').insert(row).select().single();
+  if(error){toast(error.message,'error');return;}
+  const ref=saved?'SN-'+saved.id.slice(0,6).toUpperCase():'SN-'+S.snRef++;
+  closeM('m-sn');toast(ref+' issued','success');await loadSNsFromDB();renderSNs();document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
 }
 function renderSNs(){
   const tb=document.getElementById('sn-body');if(!tb)return;
@@ -1785,12 +1839,15 @@ function rxPrev(){
   const data={ref:'PREVIEW',patName:p?fn(p):'',patDob:p?p.dob:'',patId:p?p.idnum:'',date:document.getElementById('rx-date').value,diag:document.getElementById('rx-diag').value,rep:document.getElementById('rx-rep').value,meds:rxMeds,sigImg:getSig('rx')};
   document.getElementById('rx-preview').innerHTML=buildRXDoc(data);
 }
-function saveRX(){
+async function saveRX(){
   const pid=document.getElementById('rx-pat').value;const meds=rxMeds.filter(m=>m.name.trim());
   if(!pid||!meds.length){toast('Select patient and add at least one medication','error');return}
-  const ref='RX-'+S.rxRef++;
-  S.scripts.push({id:'rx'+Date.now(),ref,pid,date:document.getElementById('rx-date').value,diag:document.getElementById('rx-diag').value.trim(),rep:document.getElementById('rx-rep').value,meds,sigImg:getSig('rx')});
-  closeM('m-rx');toast(ref+' prescription issued','success');renderRXs();document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
+  const p=gp(pid);
+  const row={patient_id:pid,doctor_name:S.doc.name,patient_name:p?fn(p):'',diag:document.getElementById('rx-diag').value.trim()||null,date:document.getElementById('rx-date').value,medications:meds};
+  const {data:saved,error}=await sbClient.from('prescriptions').insert(row).select().single();
+  if(error){toast(error.message,'error');return;}
+  const ref=saved?'RX-'+saved.id.slice(0,6).toUpperCase():'RX-'+S.rxRef++;
+  closeM('m-rx');toast(ref+' prescription issued','success');await loadRXsFromDB();renderRXs();document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
 }
 function renderRXs(){
   const tb=document.getElementById('rx-body');if(!tb)return;
@@ -2103,7 +2160,6 @@ async function saveAvailability() {
 //  INIT
 // ══════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded',()=>{
-  seed();
   document.getElementById('r-date').value=td();
   // Auto-type sig after canvas init (deferred)
   setTimeout(()=>{if(sigCtx.sn&&S.doc)typeSig('sn');},200);
