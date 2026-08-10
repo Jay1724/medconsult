@@ -439,6 +439,65 @@ body {
 
   .sheet { border-radius: var(--radius); max-width: 540px; }
   .sheet-overlay.open { align-items: center; }
+
+  #onboarding-overlay .ob-card {
+    max-width: 540px; margin: 0 auto; width: 100%;
+  }
+}
+
+/* ── ONBOARDING ── */
+#onboarding-overlay {
+  position: fixed; inset: 0; z-index: 800;
+  background: var(--bg);
+  display: none; flex-direction: column;
+  overflow-y: auto;
+}
+#onboarding-overlay.open { display: flex; flex-direction: column; }
+.ob-header {
+  background: linear-gradient(135deg, #1a5fcc 0%, var(--azure) 60%, var(--azure-light) 100%);
+  padding: calc(var(--sat) + 28px) 24px 32px;
+  flex-shrink: 0;
+}
+.ob-logo  { font-size: 15px; font-weight: 700; color: rgba(255,255,255,0.65); margin-bottom: 18px; letter-spacing: -0.2px; }
+.ob-title { font-size: 26px; font-weight: 700; color: #fff; margin-bottom: 6px; line-height: 1.2; }
+.ob-sub   { font-size: 13px; color: rgba(255,255,255,0.78); line-height: 1.5; }
+.ob-progress { display: flex; gap: 6px; margin-top: 22px; }
+.ob-prog-bar {
+  flex: 1; height: 4px; border-radius: 2px;
+  background: rgba(255,255,255,0.25);
+  transition: background 0.35s;
+}
+.ob-prog-bar.active { background: rgba(255,255,255,0.85); }
+.ob-prog-bar.done   { background: #fff; }
+.ob-body {
+  flex: 1; padding: 28px 20px calc(var(--sab) + 32px);
+  max-width: 540px; width: 100%; margin: 0 auto;
+}
+.ob-nav { display: flex; gap: 10px; margin-top: 24px; }
+.ob-nav .btn-ghost   { flex: 1; }
+.ob-nav .btn-primary { flex: 2; }
+.ob-skip {
+  display: block; text-align: center; font-size: 13px;
+  color: var(--ink3); margin-top: 16px; cursor: pointer;
+  padding: 8px; text-decoration: underline;
+  -webkit-tap-highlight-color: transparent;
+}
+.field select {
+  width: 100%; padding: 13px 40px 13px 15px;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: 'Sora', sans-serif; font-size: 15px; color: var(--ink);
+  outline: none; -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235a5a65' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+  transition: border-color 0.15s;
+}
+.field select:focus { border-color: var(--azure); box-shadow: 0 0 0 3px var(--azure-dim); }
+.ob-check-banner {
+  background: var(--success-dim); border-radius: var(--radius-sm);
+  padding: 12px 14px; font-size: 12px; color: var(--success);
+  font-weight: 600; display: flex; align-items: center; gap: 8px;
+  margin-bottom: 20px;
 }
 </style>
 </head>
@@ -579,6 +638,21 @@ body {
   </div>
 </div>
 
+<!-- ONBOARDING -->
+<div id="onboarding-overlay">
+  <div class="ob-header">
+    <div class="ob-logo">MedConsult</div>
+    <div class="ob-title" id="ob-title">Let's set up your profile</div>
+    <div class="ob-sub" id="ob-sub">Step 1 of 3 — Your name and personal details</div>
+    <div class="ob-progress">
+      <div class="ob-prog-bar active" id="ob-p1"></div>
+      <div class="ob-prog-bar" id="ob-p2"></div>
+      <div class="ob-prog-bar" id="ob-p3"></div>
+    </div>
+  </div>
+  <div class="ob-body" id="ob-body"></div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -628,6 +702,7 @@ function bootApp() {
   const app = document.getElementById('app-screen');
   app.style.display = 'flex';
   renderHome();
+  checkOnboarding();
 }
 
 // ── AUTH ─────────────────────────────────────────────
@@ -683,7 +758,7 @@ async function doRegister() {
     await sb.from('patient_invites').update({ status: 'accepted' }).eq('token', inviteToken);
   } else {
     const { data: pat, error: patErr } = await sb.from('patients')
-      .insert({ first_name: fname, last_name: lname, email, doctor_id: null })
+      .insert({ fn: fname, ln: lname, em: email, doctor_id: null })
       .select('id').single();
     if (patErr) { setBtn('reg-btn', 'Create Account', false); toast(patErr.message, 'error'); return; }
     patientId = pat.id;
@@ -1203,6 +1278,211 @@ async function confirmLinkDoctor() {
   closeLinkDoctor();
   toast(`Dr. ${selectedDr.fn} ${selectedDr.ln} authorised`, 'success');
   renderProfile();
+}
+
+// ── ONBOARDING ───────────────────────────────────────
+let obStep = 1;
+const obData = { fn:'', ln:'', dob:'', idnum:'', gen:'', ph:'', wa:'', em:'', addr:'', emer:'', aid:'', aidnum:'', aidplan:'' };
+
+function isProfileComplete(pat) {
+  return !!(pat && pat.fn && pat.ln && pat.ph && pat.addr);
+}
+
+function checkOnboarding() {
+  if (!ST.patient || isProfileComplete(ST.patient)) return;
+  obStep = 1;
+  obData.fn  = ST.patient.fn  || '';
+  obData.ln  = ST.patient.ln  || '';
+  obData.dob = ST.patient.dob || '';
+  obData.gen = ST.patient.gen || '';
+  obData.ph  = ST.patient.ph  || '';
+  obData.wa  = ST.patient.wa  || '';
+  obData.em  = ST.patient.em  || ST.user?.email || '';
+  obData.addr = ST.patient.addr || '';
+  obData.emer = ST.patient.emer || '';
+  obData.aid    = ST.patient.aid    || '';
+  obData.aidnum = ST.patient.aidnum || '';
+  obData.aidplan= ST.patient.aidplan|| '';
+  document.getElementById('onboarding-overlay').classList.add('open');
+  renderObStep();
+}
+
+function closeOnboarding() {
+  document.getElementById('onboarding-overlay').classList.remove('open');
+}
+
+function updateObHeader() {
+  const titles = ['Your Details',       'Contact & Address',       'Medical Aid'];
+  const subs   = ['Step 1 of 3 — Name and personal info', 'Step 2 of 3 — How to reach you', 'Step 3 of 3 — Medical aid (optional)'];
+  document.getElementById('ob-title').textContent = titles[obStep - 1];
+  document.getElementById('ob-sub').textContent   = subs[obStep - 1];
+  ['ob-p1','ob-p2','ob-p3'].forEach((id, i) => {
+    const el = document.getElementById(id); if (!el) return;
+    el.className = 'ob-prog-bar' + (i < obStep - 1 ? ' done' : i === obStep - 1 ? ' active' : '');
+  });
+}
+
+function renderObStep() {
+  updateObHeader();
+  const el = document.getElementById('ob-body');
+  if (obStep === 1) {
+    el.innerHTML = `
+      <div class="field"><label>First Name</label>
+        <input type="text" id="ob-fn" placeholder="Jane" value="${esc(obData.fn)}" autocomplete="given-name">
+      </div>
+      <div class="field"><label>Last Name</label>
+        <input type="text" id="ob-ln" placeholder="Doe" value="${esc(obData.ln)}" autocomplete="family-name">
+      </div>
+      <div class="field"><label>Date of Birth <span style="color:var(--ink3);font-weight:400;font-size:10px">(optional)</span></label>
+        <input type="date" id="ob-dob" value="${esc(obData.dob)}" class="date-input">
+      </div>
+      <div class="field"><label>Gender <span style="color:var(--ink3);font-weight:400;font-size:10px">(optional)</span></label>
+        <select id="ob-gen">
+          <option value="">Select…</option>
+          <option value="Male" ${obData.gen==='Male'?'selected':''}>Male</option>
+          <option value="Female" ${obData.gen==='Female'?'selected':''}>Female</option>
+          <option value="Non-binary" ${obData.gen==='Non-binary'?'selected':''}>Non-binary</option>
+          <option value="Prefer not to say" ${obData.gen==='Prefer not to say'?'selected':''}>Prefer not to say</option>
+        </select>
+      </div>
+      <div class="ob-nav">
+        <button class="btn-primary" onclick="obNext()">Continue →</button>
+      </div>`;
+    setTimeout(() => document.getElementById('ob-fn')?.focus(), 80);
+  } else if (obStep === 2) {
+    el.innerHTML = `
+      <div class="field"><label>Mobile Number</label>
+        <input type="tel" id="ob-ph" placeholder="+27 82 000 0000" value="${esc(obData.ph)}" autocomplete="tel">
+      </div>
+      <div class="field"><label>WhatsApp <span style="color:var(--ink3);font-weight:400;font-size:10px">(if different from mobile)</span></label>
+        <input type="tel" id="ob-wa" placeholder="Leave blank if same as mobile" value="${esc(obData.wa)}" autocomplete="tel">
+      </div>
+      <div class="field"><label>Email Address</label>
+        <input type="email" id="ob-em" placeholder="your@email.com" value="${esc(obData.em)}" autocomplete="email">
+      </div>
+      <div class="field"><label>Residential Address</label>
+        <input type="text" id="ob-addr" placeholder="22 Example Street, Suburb, City, 0000" value="${esc(obData.addr)}" autocomplete="street-address">
+      </div>
+      <div class="field"><label>Emergency Contact <span style="color:var(--ink3);font-weight:400;font-size:10px">(optional)</span></label>
+        <input type="text" id="ob-emer" placeholder="Name (Relationship) — +27 00 000 0000" value="${esc(obData.emer)}">
+      </div>
+      <div class="ob-nav">
+        <button class="btn-ghost" onclick="obBack()">← Back</button>
+        <button class="btn-primary" onclick="obNext()">Continue →</button>
+      </div>`;
+  } else {
+    el.innerHTML = `
+      <div class="ob-check-banner"><span class="material-icons" style="font-size:16px">check_circle</span>Almost done — medical aid is optional</div>
+      <div class="field"><label>Medical Aid Provider</label>
+        <select id="ob-aid" onchange="renderAidFields(this.value)">
+          <option value="">None / Private pay</option>
+          <option value="Discovery Health" ${obData.aid==='Discovery Health'?'selected':''}>Discovery Health</option>
+          <option value="Momentum Health" ${obData.aid==='Momentum Health'?'selected':''}>Momentum Health</option>
+          <option value="Bonitas" ${obData.aid==='Bonitas'?'selected':''}>Bonitas</option>
+          <option value="Medihelp" ${obData.aid==='Medihelp'?'selected':''}>Medihelp</option>
+          <option value="Gems" ${obData.aid==='Gems'?'selected':''}>Gems</option>
+          <option value="Fedhealth" ${obData.aid==='Fedhealth'?'selected':''}>Fedhealth</option>
+          <option value="Bestmed" ${obData.aid==='Bestmed'?'selected':''}>Bestmed</option>
+          <option value="Afrocentric / APC" ${obData.aid==='Afrocentric / APC'?'selected':''}>Afrocentric / APC</option>
+          <option value="Other" ${obData.aid==='Other'?'selected':''}>Other</option>
+        </select>
+      </div>
+      <div id="ob-aid-fields"></div>
+      <div class="ob-nav">
+        <button class="btn-ghost" onclick="obBack()">← Back</button>
+        <button class="btn-primary" id="ob-save-btn" onclick="saveOnboarding(false)">Save Profile</button>
+      </div>
+      <span class="ob-skip" onclick="saveOnboarding(true)">Skip medical aid for now →</span>`;
+    renderAidFields(obData.aid);
+  }
+}
+
+function renderAidFields(val) {
+  const el = document.getElementById('ob-aid-fields'); if (!el) return;
+  el.innerHTML = val ? `
+    <div class="field"><label>Member / Policy Number</label>
+      <input type="text" id="ob-aidnum" placeholder="e.g. MH-2024-123456" value="${esc(obData.aidnum)}">
+    </div>
+    <div class="field"><label>Plan / Option</label>
+      <input type="text" id="ob-aidplan" placeholder="e.g. Ingwe Option" value="${esc(obData.aidplan)}">
+    </div>` : '';
+}
+
+function obCollect1() {
+  obData.fn  = (document.getElementById('ob-fn')?.value  || '').trim();
+  obData.ln  = (document.getElementById('ob-ln')?.value  || '').trim();
+  obData.dob = document.getElementById('ob-dob')?.value  || '';
+  obData.gen = document.getElementById('ob-gen')?.value  || '';
+}
+function obCollect2() {
+  obData.ph   = (document.getElementById('ob-ph')?.value   || '').trim();
+  obData.wa   = (document.getElementById('ob-wa')?.value   || '').trim();
+  obData.em   = (document.getElementById('ob-em')?.value   || '').trim();
+  obData.addr = (document.getElementById('ob-addr')?.value || '').trim();
+  obData.emer = (document.getElementById('ob-emer')?.value || '').trim();
+}
+function obCollect3() {
+  obData.aid    = document.getElementById('ob-aid')?.value    || '';
+  obData.aidnum = (document.getElementById('ob-aidnum')?.value  || '').trim();
+  obData.aidplan= (document.getElementById('ob-aidplan')?.value || '').trim();
+}
+
+function obNext() {
+  if (obStep === 1) {
+    obCollect1();
+    if (!obData.fn || !obData.ln) { toast('Please enter your first and last name', 'error'); return; }
+    obStep = 2;
+  } else if (obStep === 2) {
+    obCollect2();
+    if (!obData.ph)   { toast('Please enter your mobile number', 'error'); return; }
+    if (!obData.addr) { toast('Please enter your residential address', 'error'); return; }
+    obStep = 3;
+  }
+  renderObStep();
+}
+
+function obBack() {
+  if (obStep === 2) { obCollect2(); obStep = 1; }
+  else if (obStep === 3) { obStep = 2; }
+  renderObStep();
+}
+
+async function saveOnboarding(skipAid) {
+  if (!skipAid) obCollect3();
+  const btn = document.getElementById('ob-save-btn');
+  if (btn) { btn.textContent = 'Saving…'; btn.disabled = true; }
+
+  const update = {
+    fn:   obData.fn,
+    ln:   obData.ln,
+    ph:   obData.ph,
+    wa:   obData.wa || obData.ph,
+    em:   obData.em || ST.user?.email || '',
+    addr: obData.addr,
+    emer: obData.emer || null,
+    profile_status: 'pending_review',
+  };
+  if (obData.dob) update.dob = obData.dob;
+  if (obData.gen) update.gen = obData.gen;
+  if (!skipAid && obData.aid) {
+    update.aid     = obData.aid;
+    update.aidnum  = obData.aidnum  || null;
+    update.aidplan = obData.aidplan || null;
+  }
+
+  const { error } = await sb.from('patients')
+    .update(update)
+    .eq('id', ST.account.patient_id);
+
+  if (error) {
+    toast(error.message, 'error');
+    if (btn) { btn.textContent = 'Save Profile'; btn.disabled = false; }
+    return;
+  }
+  Object.assign(ST.patient, update);
+  closeOnboarding();
+  renderHome();
+  toast('Profile saved — your doctor will verify your details shortly.', 'success');
 }
 
 // ── HELPERS ──────────────────────────────────────────
