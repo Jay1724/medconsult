@@ -737,13 +737,13 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
           <div class="plan-grid">
             <div class="plan-card" id="pc-starter" onclick="selPlan('starter')">
               <div class="plan-name">Starter</div>
-              <div class="plan-price">R 699<span>/month</span></div>
+              <div class="plan-price">R 149<span>/month</span></div>
               <div class="plan-features">Up to 50 patients<br>All core features<br>Sick notes & scripts</div>
             </div>
             <div class="plan-card selected" id="pc-pro" onclick="selPlan('pro')">
               <div class="plan-badge">POPULAR</div>
               <div class="plan-name">Professional</div>
-              <div class="plan-price">R 999<span>/month</span></div>
+              <div class="plan-price">R 299<span>/month</span></div>
               <div class="plan-features">Unlimited patients<br>All features + API<br>Priority support</div>
             </div>
           </div>
@@ -1859,7 +1859,7 @@ function endCall(){document.getElementById('video-area').innerHTML=`<div class="
 //  SUBSCRIPTION
 // ══════════════════════════════════════════════════
 function renderSub(){
-  const plans={starter:{name:'Starter',price:'R 699',feat:'Up to 50 patients · All core features'},pro:{name:'Professional',price:'R 999',feat:'Unlimited patients · All features + priority support'}};
+  const plans={starter:{name:'Starter',price:'R 149',feat:'Up to 50 patients · All core features'},pro:{name:'Professional',price:'R 299',feat:'Unlimited patients · All features + priority support'}};
   const cur=plans[S.plan];
   document.getElementById('sub-badge').textContent=(S.plan==='pro'?'PRO':'STARTER')+' — Active';
   document.getElementById('sub-plan-body').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px"><div><div style="font-size:16px;font-weight:700">${cur.name} Plan</div><div style="font-size:12px;color:var(--ink2);margin-top:4px">${cur.feat}</div></div><div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--azure)">${cur.price}<span style="font-size:12px;font-family:'Sora',sans-serif;color:var(--ink2)">/mo</span></div></div><div style="background:rgba(43,127,255,0.07);border:1px solid rgba(43,127,255,0.15);border-radius:var(--radius-sm);padding:12px;font-size:12px;color:var(--ink2);line-height:2"><b style="color:var(--azure)">✓</b> Next billing: ${new Date(Date.now()+30*24*60*60*1000).toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'})}<br><b style="color:var(--azure)">✓</b> Free trial active — 30 days remaining<br><b style="color:var(--azure)">✓</b> Auto-renews monthly · Cancel anytime</div><div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px"><div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--ink2)">Switch Plan</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${Object.entries(plans).map(([k,p])=>`<div onclick="switchPlan('${k}')" style="border:1.5px solid ${k===S.plan?'var(--azure)':'var(--border)'};background:${k===S.plan?'rgba(43,127,255,0.06)':'var(--white)'};border-radius:var(--radius-sm);padding:12px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--azure)'" onmouseout="this.style.borderColor='${k===S.plan?'var(--azure)':'var(--border)'}'"><div style="font-weight:600;font-size:12.5px">${p.name}</div><div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--azure)">${p.price}<span style="font-size:10px;font-family:'Sora',sans-serif;color:var(--ink2)">/mo</span></div>${k===S.plan?'<div style="font-size:11px;color:var(--azure);margin-top:3px">Current ✓</div>':'<div style="font-size:11px;color:var(--ink2);margin-top:3px">Switch →</div>'}</div>`).join('')}</div></div>`;
