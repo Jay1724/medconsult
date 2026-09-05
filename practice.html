@@ -109,10 +109,11 @@ input,select,textarea{font-family:inherit;outline:none}
 .plan-price span{font-size:14px;color:var(--grey-400);font-family:'Sora',sans-serif;font-weight:400}
 .plan-includes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:14px}
 .plan-inc-item{font-size:12px;color:var(--grey-300);display:flex;align-items:center;gap:6px}
-.payfast-note{background:var(--grey-800);border:1px solid var(--grey-700);border-radius:var(--radius-sm);padding:12px 14px;font-size:12px;color:var(--grey-400);display:flex;align-items:center;gap:8px;margin-bottom:20px}
+.secure-note{background:var(--grey-800);border:1px solid var(--grey-700);border-radius:var(--radius-sm);padding:12px 14px;font-size:12px;color:var(--grey-400);display:flex;align-items:center;gap:8px;margin-bottom:20px}
 
 /* EMAIL VERIFY SCREEN */
 #verify-screen{display:none;position:fixed;inset:0;background:var(--black);align-items:center;justify-content:center;padding:24px}
+#resume-screen{display:none;position:fixed;inset:0;background:var(--black);align-items:center;justify-content:center;padding:24px}
 .verify-card{background:var(--grey-900);border:1px solid var(--grey-700);border-radius:var(--radius);padding:48px;text-align:center;max-width:440px}
 .verify-icon{font-size:48px;margin-bottom:16px}
 .verify-title{font-family:'Playfair Display',serif;font-size:24px;color:var(--white);margin-bottom:8px}
@@ -316,7 +317,7 @@ tr:hover td{background:var(--grey-50)}
         <div class="trust-badge">🏥 HPCSA Aligned</div>
         <div class="trust-badge">🔒 POPIA Compliant</div>
         <div class="trust-badge">🇿🇦 South African</div>
-        <div class="trust-badge">💳 PayFast Payments</div>
+        <div class="trust-badge">💳 Stripe Payments</div>
       </div>
     </div>
 
@@ -440,16 +441,10 @@ tr:hover td{background:var(--grey-50)}
               <div class="plan-inc-item">✅ 30-day free trial</div>
             </div>
           </div>
-          <div class="reg-field"><label>Card Number <span style="color:var(--danger)">*</span></label><input type="text" id="s4-card" placeholder="4242 4242 4242 4242" maxlength="19" oninput="fmtCard(this)"><span class="field-error" id="e-s4-card"></span></div>
-          <div class="reg-row">
-            <div class="reg-field"><label>Expiry (MM / YY) <span style="color:var(--danger)">*</span></label><input type="text" id="s4-exp" placeholder="MM / YY" maxlength="7" oninput="fmtExp(this)"><span class="field-error" id="e-s4-exp"></span></div>
-            <div class="reg-field"><label>CVV <span style="color:var(--danger)">*</span></label><input type="text" id="s4-cvv" placeholder="123" maxlength="4"><span class="field-error" id="e-s4-cvv"></span></div>
-          </div>
-          <div class="reg-field"><label>Name on Card <span style="color:var(--danger)">*</span></label><input type="text" id="s4-cname" placeholder="DR JANE ROBERTS"><span class="field-error" id="e-s4-cname"></span></div>
-          <div class="payfast-note">🔒 <span>Payments processed securely via <strong>PayFast</strong>. Your card details are encrypted and never stored on our servers.</span></div>
+          <div class="secure-note">🔒 <span>You'll enter your card details on Stripe's secure payment page next. Nothing is charged until your 30-day trial ends, and your card details never touch our servers.</span></div>
           <div class="step-actions">
             <button class="reg-btn reg-btn-secondary" onclick="goStep(3)">← Back</button>
-            <button class="reg-btn reg-btn-primary" id="launch-btn" onclick="launchTrial()">🚀 Start 30-Day Free Trial</button>
+            <button class="reg-btn reg-btn-primary" id="launch-btn" onclick="launchTrial()">🚀 Continue to Secure Payment</button>
           </div>
           <div id="reg-error" style="margin-top:12px;background:var(--danger-bg);border:1px solid var(--danger);border-radius:var(--radius-sm);padding:12px;font-size:13px;color:var(--danger);display:none"></div>
         </div>
@@ -467,6 +462,19 @@ tr:hover td{background:var(--grey-50)}
     <div class="verify-email-pill" id="verify-email"></div>
     <div class="verify-sub">Click the link in that email to verify your account and complete your practice setup. Once verified, return to this page and sign in.</div>
     <button class="btn btn-primary" onclick="showLogin()">Sign In After Verifying →</button>
+  </div>
+</div>
+
+<!-- CHECKOUT CANCELLED / RESUME PAYMENT -->
+<div id="resume-screen">
+  <div class="verify-card">
+    <div class="verify-icon">💳</div>
+    <div class="verify-title">Checkout was cancelled</div>
+    <div class="verify-sub">No charge was made. Your registration details are saved for:</div>
+    <div class="verify-email-pill" id="resume-email"></div>
+    <div class="verify-sub">Pick up where you left off, or start over if you'd rather re-enter your details.</div>
+    <button class="btn btn-primary" onclick="resumeCheckout()">🚀 Continue to Secure Payment</button>
+    <button class="btn btn-secondary" style="margin-top:10px;background:var(--grey-800);border-color:var(--grey-700);color:var(--grey-300)" onclick="startOver()">Start Over</button>
   </div>
 </div>
 
@@ -662,8 +670,6 @@ function isoToday(){return new Date().toISOString().slice(0,10);}
 function initials(n){return n?n.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2):'?';}
 function capitalise(s){return s?s.charAt(0).toUpperCase()+s.slice(1).replace(/_/g,' '):'—';}
 function greeting(){const h=new Date().getHours();return h<12?'Good morning':h<17?'Good afternoon':'Good evening';}
-function fmtCard(el){let v=el.value.replace(/\D/g,'').substring(0,16);el.value=v.replace(/(.{4})/g,'$1 ').trim();}
-function fmtExp(el){let v=el.value.replace(/\D/g,'').substring(0,4);if(v.length>=3)v=v.substring(0,2)+' / '+v.substring(2);el.value=v;}
 function daysUntil(iso){return Math.max(0,Math.ceil((new Date(iso)-Date.now())/(86400000)));}
 
 function toast(msg,type='info'){
@@ -690,7 +696,7 @@ function closeSidebar(){document.getElementById('sidebar').classList.remove('ope
 
 /* ── SCREEN SWITCHER ────────────────────────────────────────── */
 function showScreen(name){
-  ['loading-screen','reg-screen','verify-screen','denied-screen','app'].forEach(id=>{
+  ['loading-screen','reg-screen','verify-screen','resume-screen','denied-screen','app'].forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.style.display='none';
   });
@@ -723,6 +729,20 @@ async function doLogout(){
 
 /* ── BOOT ───────────────────────────────────────────────────── */
 (async()=>{
+  const params=new URLSearchParams(location.search);
+  const checkoutState=params.get('checkout');
+  const stripeSessionId=params.get('session_id');
+  if(checkoutState) history.replaceState({},'',location.pathname);
+
+  if(checkoutState==='success'){ await handleCheckoutSuccess(stripeSessionId); return; }
+  if(checkoutState==='cancel'){
+    const pending=localStorage.getItem(PENDING_KEY);
+    document.getElementById('resume-email').textContent=pending?JSON.parse(pending).ownerEmail:'';
+    showScreen('resume-screen');
+    toast('Checkout was cancelled — no charge was made. Your details are saved.','warning');
+    return;
+  }
+
   const {data:{session}}=await sb.auth.getSession();
   if(!session){
     const pending=localStorage.getItem(PENDING_KEY);
@@ -733,10 +753,71 @@ async function doLogout(){
   await checkSessionAndRoute(session.user,session);
 })();
 
+/* ── STRIPE CHECKOUT RETURN ───────────────────────────────────── */
+async function handleCheckoutSuccess(sessionId){
+  showScreen('loading-screen');
+  if(!sessionId){ showScreen('reg-screen'); toast('Missing checkout session — please try again.','error'); return; }
+
+  const {data:cs,error}=await sb.functions.invoke('retrieve-checkout-session',{body:{session_id:sessionId}});
+  if(error||!cs||cs.error){
+    showScreen('reg-screen');
+    toast((cs&&cs.error)||error?.message||'Could not confirm your payment. Please contact support@medconsult.africa.','error');
+    return;
+  }
+
+  const pendingRaw=localStorage.getItem(PENDING_KEY);
+  if(!pendingRaw){
+    toast('Payment confirmed, but we could not find your registration details. Please contact support@medconsult.africa.','error');
+    showScreen('reg-screen');
+    return;
+  }
+  const regData=JSON.parse(pendingRaw);
+  regData.stripeCustomerId=cs.stripe_customer_id;
+  regData.stripeSubscriptionId=cs.stripe_subscription_id;
+  regData.subscriptionStatus=cs.subscription_status;
+  regData.trialEndsAt=cs.trial_ends_at;
+  regData.currentPeriodEnd=cs.current_period_end;
+  localStorage.setItem(PENDING_KEY,JSON.stringify(regData));
+
+  const {data:{session}}=await sb.auth.getSession();
+  if(session){
+    await completePendingSetup(session.user,regData);
+  } else {
+    document.getElementById('verify-email').textContent=regData.ownerEmail;
+    showScreen('verify-screen');
+    toast('Payment received — verify your email to activate your practice.','success');
+  }
+}
+
+async function resumeCheckout(){
+  const pendingRaw=localStorage.getItem(PENDING_KEY);
+  if(!pendingRaw){ showScreen('reg-screen'); return; }
+  const regData=JSON.parse(pendingRaw);
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){
+    document.getElementById('verify-email').textContent=regData.ownerEmail;
+    showScreen('verify-screen');
+    toast('Please verify your email first, then sign in to resume payment.','warning');
+    return;
+  }
+  showScreen('loading-screen');
+  const {data:cs,error}=await sb.functions.invoke('create-checkout-session',{body:{auth_id:session.user.id,email:regData.ownerEmail,name:`${regData.ownerFn} ${regData.ownerLn}`}});
+  if(error||!cs?.url){
+    showScreen('resume-screen');
+    toast((cs&&cs.error)||error?.message||'Could not start checkout. Please try again.','error');
+    return;
+  }
+  location.href=cs.url;
+}
+function startOver(){
+  localStorage.removeItem(PENDING_KEY);
+  showScreen('reg-screen');
+}
+
 async function checkSessionAndRoute(user,session){
-  showEl('loading-screen');
+  showScreen('loading-screen');
   const {data:member}=await sb.from('practice_members')
-    .select('role,practice_id,practices(id,name,address,phone,email,hpcsa_number,vat_number,bank_account,plan,trial_ends_at,created_at)')
+    .select('role,practice_id,practices(id,name,address,phone,email,hpcsa_number,vat_number,bank_account,plan,trial_ends_at,created_at,stripe_customer_id,stripe_subscription_id,subscription_status,current_period_end,cancel_at_period_end)')
     .eq('auth_id',user.id)
     .in('role',['owner','admin'])
     .maybeSingle();
@@ -759,13 +840,22 @@ async function checkSessionAndRoute(user,session){
 
 /* ── COMPLETE PENDING SETUP ─────────────────────────────────── */
 async function completePendingSetup(user,reg){
+  if(!reg.stripeSubscriptionId){
+    /* Payment hasn't been completed in this browser yet (e.g. storage was cleared
+       after checkout, or they verified email before finishing Stripe Checkout) —
+       resume payment rather than granting a practice with no subscription behind it. */
+    document.getElementById('resume-email').textContent=reg.ownerEmail;
+    showScreen('resume-screen');
+    return;
+  }
   try{
     /* 1. Insert practice */
-    const trialEnd=new Date(Date.now()+30*86400000).toISOString();
     const {data:practice,error:pe}=await sb.from('practices').insert({
       name:reg.practiceName,address:reg.practiceAddr,phone:reg.practicePhone,
       email:reg.practiceEmail,hpcsa_number:reg.practiceHpcsa,vat_number:reg.practiceVat||null,
-      plan:'practice',trial_ends_at:trialEnd
+      plan:'practice',trial_ends_at:reg.trialEndsAt,
+      stripe_customer_id:reg.stripeCustomerId,stripe_subscription_id:reg.stripeSubscriptionId,
+      subscription_status:reg.subscriptionStatus,current_period_end:reg.currentPeriodEnd
     }).select().single();
     if(pe) throw pe;
 
@@ -1024,16 +1114,31 @@ async function sendInvite(){
 /* ── BILLING ────────────────────────────────────────────────── */
 async function loadBilling(){
   const p=ST.practice;
+  const status=p?.subscription_status;
   const trialEnd=p?.trial_ends_at;
+  const periodEnd=p?.current_period_end;
   const days=trialEnd?daysUntil(trialEnd):0;
-  const statusLabel=trialEnd&&new Date(trialEnd)>Date.now()?`Trial — ${days} day${days!==1?'s':''} left`:'Active';
-  const statusColor=trialEnd&&new Date(trialEnd)>Date.now()?(days<=7?'#dc2626':days<=14?'#d97706':'rgba(255,255,255,.9)'):'rgba(255,255,255,.9)';
+
+  let statusLabel,statusColor;
+  if(status==='trialing'){statusLabel=`Trial — ${days} day${days!==1?'s':''} left`;statusColor=days<=7?'#dc2626':days<=14?'#d97706':'rgba(255,255,255,.9)';}
+  else if(status==='active'){statusLabel='Active';statusColor='rgba(255,255,255,.9)';}
+  else if(status==='past_due'||status==='unpaid'){statusLabel='Payment Failed';statusColor='#dc2626';}
+  else if(status==='canceled'||status==='incomplete_expired'){statusLabel='Cancelled';statusColor='rgba(255,255,255,.6)';}
+  else if(status==='incomplete'){statusLabel='Incomplete';statusColor='#d97706';}
+  else{
+    /* Pre-Stripe legacy record with no subscription on file */
+    const trialActive=trialEnd&&new Date(trialEnd)>Date.now();
+    statusLabel=trialActive?`Trial — ${days} day${days!==1?'s':''} left`:'No active subscription';
+    statusColor=trialActive?'rgba(255,255,255,.9)':'#dc2626';
+  }
+  const cancelNotice=p?.cancel_at_period_end?`<div style="font-size:12px;color:#d97706;margin-top:10px">⚠️ Cancels at the end of the current billing period (${periodEnd?fmtDate(periodEnd):'—'}).</div>`:'';
 
   document.getElementById('billing-content').innerHTML=`
     <div class="plan-card-dash">
       <div class="plan-card-name">Practice Plan</div>
       <div class="plan-card-price">R 5,000<span> / month</span></div>
       <div class="plan-card-status" style="background:rgba(255,255,255,.15);color:${statusColor}">📌 ${esc(statusLabel)}</div>
+      ${cancelNotice}
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -1041,8 +1146,8 @@ async function loadBilling(){
       <div class="billing-info-row"><span class="billing-info-label">Plan</span><span class="billing-info-value">Practice Plan</span></div>
       <div class="billing-info-row"><span class="billing-info-label">Status</span><span class="billing-info-value">${esc(statusLabel)}</span></div>
       <div class="billing-info-row"><span class="billing-info-label">Trial ends</span><span class="billing-info-value">${trialEnd?fmtDate(trialEnd):'—'}</span></div>
-      <div class="billing-info-row"><span class="billing-info-label">Payment method</span><span class="billing-info-value">•••• •••• •••• — <span style="color:var(--ink2);font-size:12px">Not yet added</span></span></div>
-      <div class="billing-info-row"><span class="billing-info-label">Next billing date</span><span class="billing-info-value">${trialEnd?fmtDate(trialEnd):'—'}</span></div>
+      <div class="billing-info-row"><span class="billing-info-label">Next billing date</span><span class="billing-info-value">${periodEnd?fmtDate(periodEnd):(trialEnd?fmtDate(trialEnd):'—')}</span></div>
+      <div class="billing-info-row"><span class="billing-info-label">Payment method</span><span class="billing-info-value" style="font-size:12px;color:var(--ink2)">Managed securely via Stripe</span></div>
     </div>
 
     <div class="card" style="margin-bottom:16px">
@@ -1061,18 +1166,20 @@ async function loadBilling(){
 
     <div class="card" style="margin-bottom:16px">
       <div class="card-title">Billing History</div>
-      <div class="empty" style="padding:24px"><div class="empty-icon">🧾</div><div class="empty-title">No invoices yet</div><div class="empty-sub">Your first invoice will appear here after your trial ends</div></div>
+      <div class="empty" style="padding:24px"><div class="empty-icon">🧾</div><div class="empty-title">View invoices in Stripe</div><div class="empty-sub">Open Manage Billing below to see receipts and past invoices</div></div>
     </div>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="toast('Payment method update — contact support@medconsult.africa','info')">Update Payment Method</button>
-      <button class="btn btn-danger" onclick="confirmCancelSub()">Cancel Subscription</button>
-    </div>`;
+      <button class="btn btn-primary" onclick="openBillingPortal()" ${p?.stripe_customer_id?'':'disabled'}>💳 Manage Billing</button>
+    </div>
+    <div style="font-size:12px;color:var(--ink2);margin-top:8px">Update your card, view invoices, or cancel your subscription — all handled securely by Stripe.</div>`;
 }
-function confirmCancelSub(){
-  confirmAction('Cancel your subscription?','Your practice and all data will remain accessible until the end of the current billing period. This cannot be undone.',async()=>{
-    toast('Cancellation request received — our team will contact you within 24 hours.','warning');
-  });
+async function openBillingPortal(){
+  const p=ST.practice;
+  if(!p?.stripe_customer_id){toast('No Stripe subscription on file yet.','error');return;}
+  const {data,error}=await sb.functions.invoke('create-billing-portal-session',{body:{stripe_customer_id:p.stripe_customer_id}});
+  if(error||!data?.url){toast((data&&data.error)||error?.message||'Could not open billing portal.','error');return;}
+  location.href=data.url;
 }
 
 /* ── SETTINGS ───────────────────────────────────────────────── */
@@ -1186,19 +1293,6 @@ function validateStep(n){
     v('s2-hpcsa','Personal HPCSA number is required');v('s2-sig','Signature name is required');
     return ok;
   }
-  if(n===4){
-    /* validate step 4 billing */
-    clearFields('s4-card','s4-exp','s4-cvv','s4-cname');
-    let ok=true;
-    const card=document.getElementById('s4-card').value.replace(/\s/g,'');
-    if(!card||card.length<16){fieldErr('e-s4-card','Valid 16-digit card number required');markInvalid('s4-card',true);ok=false;}
-    const exp=document.getElementById('s4-exp').value.trim();
-    if(!exp||exp.length<7){fieldErr('e-s4-exp','Valid expiry date required (MM / YY)');markInvalid('s4-exp',true);ok=false;}
-    const cvv=document.getElementById('s4-cvv').value.trim();
-    if(!cvv||cvv.length<3){fieldErr('e-s4-cvv','CVV must be 3–4 digits');markInvalid('s4-cvv',true);ok=false;}
-    if(!document.getElementById('s4-cname').value.trim()){fieldErr('e-s4-cname','Name on card is required');markInvalid('s4-cname',true);ok=false;}
-    return ok;
-  }
   return true;
 }
 
@@ -1234,10 +1328,9 @@ function renderTeamRows(){
 
 /* ── LAUNCH TRIAL ───────────────────────────────────────────── */
 async function launchTrial(){
-  if(!validateStep(4))return;
   const btn=document.getElementById('launch-btn');
   const errEl=document.getElementById('reg-error');
-  btn.disabled=true;btn.textContent='Launching…';errEl.style.display='none';
+  btn.disabled=true;btn.textContent='Redirecting to payment…';errEl.style.display='none';
 
   const ownerEmail=document.getElementById('s2-email').value.trim();
   const ownerPw=document.getElementById('s2-pw').value;
@@ -1271,18 +1364,23 @@ async function launchTrial(){
     email:ownerEmail,password:ownerPw,
     options:{data:{fn:regData.ownerFn,ln:regData.ownerLn,spec:regData.ownerSpec,hpcsa:regData.ownerHpcsa,name:`Dr. ${regData.ownerFn} ${regData.ownerLn}`}}
   });
-  btn.disabled=false;btn.textContent='🚀 Start 30-Day Free Trial';
 
-  if(error){localStorage.removeItem(PENDING_KEY);errEl.style.display='block';errEl.textContent=error.message;return;}
-
-  if(data.session){
-    /* Email verification not required — complete setup immediately */
-    await completePendingSetup(data.user,regData);
-  } else {
-    /* Email verification required */
-    document.getElementById('verify-email').textContent=ownerEmail;
-    showScreen('verify-screen');
+  if(error){
+    btn.disabled=false;btn.textContent='🚀 Continue to Secure Payment';
+    localStorage.removeItem(PENDING_KEY);errEl.style.display='block';errEl.textContent=error.message;return;
   }
+
+  /* Card details are collected on Stripe's own page next, never on ours. */
+  const {data:cs,error:csErr}=await sb.functions.invoke('create-checkout-session',{
+    body:{auth_id:data.user.id,email:ownerEmail,name:`${regData.ownerFn} ${regData.ownerLn}`}
+  });
+  if(csErr||!cs?.url){
+    btn.disabled=false;btn.textContent='🚀 Continue to Secure Payment';
+    errEl.style.display='block';
+    errEl.textContent=(cs&&cs.error)||csErr?.message||'Could not start checkout. Please try again.';
+    return;
+  }
+  location.href=cs.url;
 }
 </script>
 </body>
