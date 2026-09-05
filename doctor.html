@@ -6,6 +6,7 @@
 <title>MedConsult — Doctor Platform</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="medical-aid.js"></script>
 <style>
 /* ── DESIGN TOKENS ──────────────────────────────────────── */
 :root {
@@ -993,8 +994,8 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
         <div class="fg"><label>WhatsApp</label><input type="tel" id="p-wa" placeholder="+27 71 234 5678"></div>
         <div class="fg full"><label>Email</label><input type="email" id="p-em" placeholder="patient@email.com"></div>
         <div class="fg full"><label>Address</label><textarea id="p-addr" rows="2" placeholder="Street, City, Province, Code"></textarea></div>
-        <div class="fg"><label>Medical Aid Provider</label><select id="p-aid"><option value="">None / Private</option><option>Discovery Health</option><option>Momentum Health</option><option>Bonitas</option><option>Medihelp</option><option>GEMS</option><option>Bestmed</option><option>Fedhealth</option><option>Hosmed</option><option>Other</option></select></div>
-        <div class="fg"><label>Member Number</label><input id="p-aidnum" placeholder="Member number"></div>
+        <div class="fg"><label>Medical Aid Provider</label><select id="p-aid" onchange="validatePAid()"><option value="">None / Private</option></select></div>
+        <div class="fg"><label>Member Number</label><input id="p-aidnum" placeholder="Member number" oninput="validatePAid()"><span id="p-aidnum-err" style="display:block;font-size:11px;color:var(--danger,#dc2626);margin-top:4px"></span></div>
         <div class="fg"><label>Plan / Option</label><input id="p-aidplan" placeholder="e.g. Classic Delta"></div>
         <div class="fg"><label>Principal Member</label><input id="p-principal" placeholder="If different"></div>
         <div class="fg full"><label>Allergies</label><input id="p-allerg" placeholder="e.g. Penicillin, Aspirin, Latex"></div>
@@ -1259,9 +1260,9 @@ let sigHasContent = {sn: false, rx: false};
 // ── SEED DATA ──────────────────────────────────
 function seed() {
   S.patients = [
-    {id:'p1',fn:'Thabo',ln:'Mokoena',dob:'1985-03-15',idnum:'8503155009087',gen:'Male',bl:'O+',ph:'+27 71 234 5678',wa:'+27 71 234 5678',em:'thabo.mokoena@email.com',addr:'12 Oak Street, Johannesburg, 2001',aid:'Discovery Health',aidnum:'DH123456',aidplan:'Classic Delta',principal:'',allerg:'Penicillin',chronic:'Hypertension',emer:'Nomsa Mokoena +27 82 987 6543',col:'#2563eb'},
-    {id:'p2',fn:'Sarah',ln:'van der Berg',dob:'1992-07-22',idnum:'9207225009087',gen:'Female',bl:'A+',ph:'+27 82 345 6789',wa:'+27 82 345 6789',em:'sarah.vdb@email.com',addr:'45 Protea Ave, Cape Town, 8001',aid:'Momentum Health',aidnum:'MH789012',aidplan:'Ingwe',principal:'',allerg:'None known',chronic:'Asthma',emer:'John van der Berg +27 83 111 2222',col:'#7c3aed'},
-    {id:'p3',fn:'Mohammed',ln:'Hassan',dob:'1978-11-08',idnum:'7811085009087',gen:'Male',bl:'B+',ph:'+27 83 456 7890',wa:'+27 83 456 7890',em:'m.hassan@email.com',addr:'88 Berea Road, Durban, 4001',aid:'Bonitas Medical Fund',aidnum:'BM345678',aidplan:'BonCap',principal:'',allerg:'Sulfa drugs',chronic:'Diabetes Type 2',emer:'Fatima Hassan +27 84 333 4444',col:'#d97706'},
+    {id:'p1',fn:'Thabo',ln:'Mokoena',dob:'1985-03-15',idnum:'8503155009087',gen:'Male',bl:'O+',ph:'+27 71 234 5678',wa:'+27 71 234 5678',em:'thabo.mokoena@email.com',addr:'12 Oak Street, Johannesburg, 2001',aid:'Discovery Health Medical Scheme',aidnum:'8004512396',aidstatus:'verified',aidplan:'Classic Delta',principal:'',allerg:'Penicillin',chronic:'Hypertension',emer:'Nomsa Mokoena +27 82 987 6543',col:'#2563eb'},
+    {id:'p2',fn:'Sarah',ln:'van der Berg',dob:'1992-07-22',idnum:'9207225009087',gen:'Female',bl:'A+',ph:'+27 82 345 6789',wa:'+27 82 345 6789',em:'sarah.vdb@email.com',addr:'45 Protea Ave, Cape Town, 8001',aid:'Momentum Medical Scheme',aidnum:'MH789012',aidstatus:'unverified',aidplan:'Ingwe',principal:'',allerg:'None known',chronic:'Asthma',emer:'John van der Berg +27 83 111 2222',col:'#7c3aed'},
+    {id:'p3',fn:'Mohammed',ln:'Hassan',dob:'1978-11-08',idnum:'7811085009087',gen:'Male',bl:'B+',ph:'+27 83 456 7890',wa:'+27 83 456 7890',em:'m.hassan@email.com',addr:'88 Berea Road, Durban, 4001',aid:'Bonitas Medical Fund',aidnum:'34567891',aidstatus:'unverified',aidplan:'BonCap',principal:'',allerg:'Sulfa drugs',chronic:'Diabetes Type 2',emer:'Fatima Hassan +27 84 333 4444',col:'#d97706'},
     {id:'p4',fn:'Liesel',ln:'Pretorius',dob:'2001-02-14',idnum:'0102145009087',gen:'Female',bl:'AB-',ph:'+27 73 567 8901',wa:'+27 73 567 8901',em:'liesel.p@email.com',addr:'3 Jacaranda Lane, Pretoria, 0001',aid:'',aidnum:'',aidplan:'',principal:'',allerg:'Latex',chronic:'None',emer:'Pieter Pretorius +27 82 555 6666',col:'#be185d'},
   ];
   S.records = [
@@ -1272,7 +1273,7 @@ function seed() {
     {id:'inv-1001',num:'INV-1001',pid:'p1',date:'2026-04-10',due:'2026-04-25',lines:[{d:'General Consultation',q:1,r:700},{d:'BP Monitoring',q:1,r:150}],notes:'EFT: FNB Acc 62123456. Ref: Mokoena',status:'Paid'},
     {id:'inv-1002',num:'INV-1002',pid:'p2',date:'2026-04-15',due:'2026-04-30',lines:[{d:'Telehealth Consultation',q:1,r:600},{d:'Spirometry',q:1,r:350}],notes:'',status:'Pending'},
   ];
-  S.claims = [{id:'cl-5001',ref:'CLM-5001',pid:'p1',aidProv:'Discovery Health',aidnum:'DH123456',dtSvc:'2026-04-10',icd:'I10',tariff:'0190',svc:'General Consultation',amt:700,notes:'',status:'Submitted',subDate:'2026-04-10'}];
+  S.claims = [{id:'cl-5001',ref:'CLM-5001',pid:'p1',aidProv:'Discovery Health Medical Scheme',aidnum:'8004512396',dtSvc:'2026-04-10',icd:'I10',tariff:'0190',svc:'General Consultation',amt:700,notes:'',status:'Submitted',subDate:'2026-04-10'}];
   S.sickNotes = [{id:'sn1',ref:'SN-2400',pid:'p2',date:'2026-04-15',from:'2026-04-15',to:'2026-04-19',diag:'Acute Asthma Exacerbation',icd:'J45.1',inst:'Bed rest, adequate fluids, avoid cold air and smoke.',sigImg:''}];
   S.scripts = [{id:'rx1',ref:'RX-3300',pid:'p1',date:'2026-04-10',diag:'Hypertension',rep:'3',meds:[{name:'Amlodipine',str:'10mg',dose:'Once daily in the morning',qty:'30 tablets',inst:'Take with or without food'}],sigImg:''}];
   S.snRef = 2401; S.rxRef = 3301;
@@ -1582,17 +1583,36 @@ function renderPats(filter=''){
   const fl=filter?S.patients.filter(p=>fn(p).toLowerCase().includes(filter.toLowerCase())||p.ph.includes(filter)||p.em.toLowerCase().includes(filter.toLowerCase())):S.patients;
   document.getElementById('pc-count').textContent=fl.length;
   if(!fl.length){tb.innerHTML='<tr><td colspan="6"><div style="text-align:center;padding:40px;color:var(--ink2)">No patients found</div></td></tr>';return}
-  tb.innerHTML=fl.map(p=>`<tr onclick="openDetail('${p.id}')"><td><div class="p-cell"><div class="mini-av" style="background:${p.col};border-radius:7px">${ini(p)}</div><div><div style="font-weight:500">${fn(p)}</div><div style="font-size:11px;color:var(--ink2)">${p.em}</div></div></div></td><td style="font-family:'JetBrains Mono',monospace;font-size:12px">${p.idnum||'—'}<br><span style="color:var(--ink2)">${p.dob}</span></td><td>${p.ph}<br><span style="font-size:11px;color:#25d366">📱 ${p.wa||p.ph}</span></td><td>${p.aid?`<span style="font-weight:500">${p.aid}</span><br><span style="font-size:11px;color:var(--ink2)">${p.aidnum}</span>`:'<span style="color:var(--ink2)">Private</span>'}</td><td><span class="pill pill-green">Active</span></td><td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();editPat('${p.id}')">Edit</button> <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();qCall('${p.id}')">📱</button> <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();showAddSN('${p.id}')">📄</button> <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();showAddRX('${p.id}')">💊</button></td></tr>`).join('');
+  tb.innerHTML=fl.map(p=>`<tr onclick="openDetail('${p.id}')"><td><div class="p-cell"><div class="mini-av" style="background:${p.col};border-radius:7px">${ini(p)}</div><div><div style="font-weight:500">${fn(p)}</div><div style="font-size:11px;color:var(--ink2)">${p.em}</div></div></div></td><td style="font-family:'JetBrains Mono',monospace;font-size:12px">${p.idnum||'—'}<br><span style="color:var(--ink2)">${p.dob}</span></td><td>${p.ph}<br><span style="font-size:11px;color:#25d366">📱 ${p.wa||p.ph}</span></td><td>${p.aid?`<span style="font-weight:500">${p.aid}</span><br><span style="font-size:11px;color:var(--ink2)">${p.aidnum}</span> ${aidPill(p)}`:'<span style="color:var(--ink2)">Private</span>'}</td><td><span class="pill pill-green">Active</span></td><td style="white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();editPat('${p.id}')">Edit</button> <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();qCall('${p.id}')">📱</button> <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();showAddSN('${p.id}')">📄</button> <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();showAddRX('${p.id}')">💊</button></td></tr>`).join('');
 }
 function filterPats(v){renderPats(v)}
 function globalSearch(v){if(v.length>1){renderPats(v);nav('patients',document.querySelector('[onclick*=patients]'));}}
 function showAddPatient(){editPID=null;document.getElementById('m-patient-title').textContent='Add New Patient';['fn','ln','id','ph','wa','em','aidnum','aidplan','principal','allerg','chronic','emer'].forEach(f=>{const el=document.getElementById('p-'+f);if(el)el.value=''});document.getElementById('p-dob').value='';document.getElementById('p-addr').value='';document.getElementById('p-aid').value='';document.getElementById('p-gen').value='Female';document.getElementById('p-bl').value='';openM('m-patient');}
 function editPat(id){const p=gp(id);editPID=id;document.getElementById('m-patient-title').textContent='Edit Patient';['fn','ln','dob','idnum','gen','bl','ph','wa','em'].forEach(k=>{const el=document.getElementById('p-'+k.replace('idnum','id').replace('gen','gen').replace('bl','bl'));if(el)el.value=p[k]||p[k.replace('fn','fn').replace('ln','ln')]||''});document.getElementById('p-fn').value=p.fn;document.getElementById('p-ln').value=p.ln;document.getElementById('p-dob').value=p.dob||'';document.getElementById('p-id').value=p.idnum||'';document.getElementById('p-gen').value=p.gen||'Female';document.getElementById('p-bl').value=p.bl||'';document.getElementById('p-ph').value=p.ph||'';document.getElementById('p-wa').value=p.wa||'';document.getElementById('p-em').value=p.em||'';document.getElementById('p-addr').value=p.addr||'';document.getElementById('p-aid').value=p.aid||'';document.getElementById('p-aidnum').value=p.aidnum||'';document.getElementById('p-aidplan').value=p.aidplan||'';document.getElementById('p-principal').value=p.principal||'';document.getElementById('p-allerg').value=p.allerg||'';document.getElementById('p-chronic').value=p.chronic||'';document.getElementById('p-emer').value=p.emer||'';openM('m-patient');}
+function aidPill(p){const pi=MedicalAid.statusPill(p.aidstatus||'unverified');return `<span class="pill ${pi.cls}" style="cursor:pointer" title="Click to verify medical aid" onclick="event.stopPropagation();verifyAid('${p.id}')">${pi.label}</span>`;}
+function validatePAid(){const aid=document.getElementById('p-aid').value,num=document.getElementById('p-aidnum').value.trim(),err=document.getElementById('p-aidnum-err');if(!aid||!num){err.textContent='';return}const v=MedicalAid.validate(aid,num);err.textContent=v.status==='format_invalid'?v.message:'';}
+async function verifyAid(id){
+  const p=gp(id); if(!p||!p.aid) return;
+  const v=MedicalAid.validate(p.aid,p.aidnum);
+  if(v.status==='format_invalid'){p.aidstatus='invalid';toast(v.message,'error');renderPats();return}
+  let msg=v.message;
+  try{
+    const {data,error}=await sbClient.functions.invoke('check-medical-aid',{body:{provider:p.aid,member_number:p.aidnum,id_number:p.idnum}});
+    if(!error&&data){
+      msg=data.message||msg;
+      if(data.status==='invalid'){p.aidstatus='invalid';toast(msg,'error');renderPats();return}
+      if(data.status==='valid'){p.aidstatus='verified';toast(msg,'success');renderPats();return}
+    }
+  }catch(e){/* verification service unreachable — fall through to manual confirm */}
+  if(confirm(msg+'\n\nHave you confirmed this membership with '+(v.scheme||p.aid)+' (phone or provider portal)?\nOK = mark Verified, Cancel = leave Unverified.')){p.aidstatus='verified';toast('Medical aid marked as verified','success');}
+  renderPats();
+}
 function savePat(){
   const fn2=document.getElementById('p-fn').value.trim(),ln2=document.getElementById('p-ln').value.trim();
   if(!fn2||!ln2){toast('Enter first and last name','error');return}
   const d={fn:fn2,ln:ln2,dob:document.getElementById('p-dob').value,idnum:document.getElementById('p-id').value.trim(),gen:document.getElementById('p-gen').value,bl:document.getElementById('p-bl').value,ph:document.getElementById('p-ph').value.trim(),wa:document.getElementById('p-wa').value.trim()||document.getElementById('p-ph').value.trim(),em:document.getElementById('p-em').value.trim(),addr:document.getElementById('p-addr').value.trim(),aid:document.getElementById('p-aid').value,aidnum:document.getElementById('p-aidnum').value.trim(),aidplan:document.getElementById('p-aidplan').value.trim(),principal:document.getElementById('p-principal').value.trim(),allerg:document.getElementById('p-allerg').value.trim(),chronic:document.getElementById('p-chronic').value.trim(),emer:document.getElementById('p-emer').value.trim(),col:['#2563eb','#7c3aed','#d97706','#be185d','#0891b2','#16a34a'][Math.floor(Math.random()*6)]};
-  if(editPID){const i=S.patients.findIndex(p=>p.id===editPID);S.patients[i]={...S.patients[i],...d};toast('Patient updated','success');}else{d.id='p'+Date.now();S.patients.push(d);toast('Patient added','success');}
+  if(d.aid){const v=MedicalAid.validate(d.aid,d.aidnum);if(v.status==='format_invalid'){toast(v.message,'error');return}}
+  if(editPID){const i=S.patients.findIndex(p=>p.id===editPID);const old=S.patients[i];d.aidstatus=d.aid?((old.aid===d.aid&&old.aidnum===d.aidnum)?(old.aidstatus||'unverified'):'unverified'):undefined;S.patients[i]={...old,...d};toast('Patient updated','success');}else{d.id='p'+Date.now();if(d.aid)d.aidstatus='unverified';S.patients.push(d);toast('Patient added','success');}
   closeM('m-patient');renderPats();popSelects();document.getElementById('s-patients').textContent=S.patients.length;
 }
 
@@ -1606,7 +1626,7 @@ function openDetail(id){
   document.getElementById('d-av').textContent=ini(p);
   document.getElementById('d-name').textContent=fn(p);
   document.getElementById('d-meta').textContent=`${p.gen} · ${p.dob} · ${p.aid||'Private Patient'}`;
-  document.getElementById('d-info').innerHTML=[['ID Number',p.idnum||'—'],['Blood Type',p.bl||'—'],['Phone',p.ph],['WhatsApp',p.wa||p.ph],['Email',p.em],['Address',p.addr||'—'],['Medical Aid',p.aid||'None'],['Aid Number',p.aidnum||'—'],['Plan',p.aidplan||'—'],['Principal',p.principal||'Self'],['Allergies',p.allerg||'None known'],['Chronic',p.chronic||'None'],['Emergency',p.emer||'—']].map(([k,v])=>`<div class="info-cell"><div class="info-cell-label">${k}</div><div class="info-cell-value">${v}</div></div>`).join('');
+  document.getElementById('d-info').innerHTML=[['ID Number',p.idnum||'—'],['Blood Type',p.bl||'—'],['Phone',p.ph],['WhatsApp',p.wa||p.ph],['Email',p.em],['Address',p.addr||'—'],['Medical Aid',p.aid||'None'],['Aid Number',p.aidnum||'—'],['Plan',p.aidplan||'—'],['Aid Status',p.aid?MedicalAid.statusPill(p.aidstatus||'unverified').label:'—'],['Principal',p.principal||'Self'],['Allergies',p.allerg||'None known'],['Chronic',p.chronic||'None'],['Emergency',p.emer||'—']].map(([k,v])=>`<div class="info-cell"><div class="info-cell-label">${k}</div><div class="info-cell-value">${v}</div></div>`).join('');
   const recs=S.records.filter(r=>r.pid===id);
   document.getElementById('d-recs').innerHTML=recs.length?recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="rec-item"><div class="rec-date">${r.date} · ${r.type}</div><div class="rec-title">${r.diag} <span class="pill pill-blue" style="font-size:10px">${r.icd}</span></div><div class="rec-notes">${r.notes}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records yet</div>';
   const invs=S.invoices.filter(i=>i.pid===id);
@@ -2103,6 +2123,8 @@ async function saveAvailability() {
 //  INIT
 // ══════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded',()=>{
+  const aidSel=document.getElementById('p-aid');
+  MedicalAid.schemeNames().concat(['Other']).forEach(n=>{const o=document.createElement('option');o.textContent=n;aidSel.appendChild(o);});
   seed();
   document.getElementById('r-date').value=td();
   // Auto-type sig after canvas init (deferred)
