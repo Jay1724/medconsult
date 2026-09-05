@@ -6,6 +6,7 @@
 <title>MedConsult — Reception Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="medical-aid.js"></script>
 <style>
 /* ── TOKENS ─────────────────────────────────────────────── */
 :root {
@@ -576,11 +577,13 @@ tr:hover td{background:var(--grey-50)}
       <div class="form-row">
         <div class="form-field">
           <label>Provider</label>
-          <input type="text" id="np-ma-provider" placeholder="e.g. Discovery, Medshield">
+          <input type="text" id="np-ma-provider" list="ma-scheme-list" placeholder="e.g. Discovery, Medshield" oninput="validateNpAid()">
+          <datalist id="ma-scheme-list"></datalist>
         </div>
         <div class="form-field">
           <label>Member Number</label>
-          <input type="text" id="np-ma-number" placeholder="Member number">
+          <input type="text" id="np-ma-number" placeholder="Member number" oninput="validateNpAid()">
+          <span class="field-error" id="err-np-ma-number"></span>
         </div>
       </div>
       <div class="form-row">
@@ -612,6 +615,22 @@ tr:hover td{background:var(--grey-50)}
   </div>
 </div>
 
+<div class="modal-overlay" id="modal-verify-aid">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Verify Medical Aid</h2>
+      <button class="modal-close" onclick="closeVerifyAid()">×</button>
+    </div>
+    <div class="modal-body" id="verify-aid-body"></div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeVerifyAid()">Close</button>
+      <button class="btn btn-secondary" id="va-invalid-btn" onclick="setAidStatus('invalid','manual')">Mark Invalid</button>
+      <button class="btn btn-secondary" id="va-check-btn" onclick="runAidCheck()">Run Check</button>
+      <button class="btn btn-primary" id="va-verify-btn" onclick="setAidStatus('verified','manual')">Mark Verified</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
@@ -626,6 +645,9 @@ let allPatients = [];
 
 /* ── HELPERS ───────────────────────────────────────────────── */
 function esc(s){ const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
+function setBtn(id,label,busy){ const b=document.getElementById(id); if(!b) return; b.textContent=label; b.disabled=!!busy; }
+// Offer the registered schemes as provider suggestions (free text still allowed)
+document.getElementById('ma-scheme-list').innerHTML=MedicalAid.schemeNames().map(n=>`<option value="${n}"></option>`).join('');
 function fmtDate(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'}); }
 function fmtTime(t){ if(!t) return '—'; const [h,m]=t.split(':'); const hr=parseInt(h); return `${hr>12?hr-12:hr===0?12:hr}:${m} ${hr>=12?'PM':'AM'}`; }
 function isoToday(){ return new Date().toISOString().slice(0,10); }
@@ -873,7 +895,7 @@ async function loadDoctorsCache(){
   populateDoctorSelect();
 }
 async function loadPatientsCache(){
-  const {data}=await sb.from('patients').select('id,first_name,last_name,dob,id_number,phone,email,address,medical_aid_provider,medical_aid_number,medical_aid_plan,medical_aid_principal,doctor_id').order('last_name');
+  const {data}=await sb.from('patients').select('id,first_name,last_name,dob,id_number,phone,email,address,medical_aid_provider,medical_aid_number,medical_aid_plan,medical_aid_principal,medical_aid_status,medical_aid_checked_at,medical_aid_checked_by,medical_aid_check_method,doctor_id').order('last_name');
   allPatients=data||[];
 }
 
@@ -1089,14 +1111,101 @@ function renderPatientTable(pts){
   const wrap=document.getElementById('pat-list-wrap');
   if(!pts.length){ wrap.innerHTML=`<div class="empty"><div class="empty-icon">👤</div><div class="empty-title">No patients found</div><div class="empty-sub">Use the + New Patient button to register a patient</div></div>`; return; }
   wrap.innerHTML=`<div class="tbl-wrap"><table>
-    <thead><tr><th>Patient</th><th>Phone</th><th>Email</th><th>Medical Aid</th></tr></thead>
+    <thead><tr><th>Patient</th><th>Phone</th><th>Email</th><th>Medical Aid</th><th>Aid Status</th></tr></thead>
     <tbody>${pts.map(p=>`<tr>
       <td><strong>${esc(p.first_name+' '+p.last_name)}</strong></td>
       <td>${esc(p.phone||'—')}</td>
       <td>${esc(p.email||'—')}</td>
       <td>${p.medical_aid_provider?`<span class="pill pill-blue">${esc(p.medical_aid_provider)}</span>`:'<span class="pill pill-grey">Self-pay</span>'}</td>
+      <td>${aidStatusCell(p)}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
+}
+
+/* ── MEDICAL AID VERIFICATION ───────────────────────────────── */
+function aidStatusCell(p){
+  if(!p.medical_aid_provider) return '<span style="color:var(--ink2)">—</span>';
+  const pill=MedicalAid.statusPill(p.medical_aid_status||'unverified');
+  return `<span class="pill ${pill.cls}">${pill.label}</span> <button class="btn btn-secondary btn-sm" style="margin-left:6px" onclick="showVerifyAid('${p.id}')">Verify</button>`;
+}
+
+let verifyingPID=null;
+function showVerifyAid(pid){
+  verifyingPID=pid;
+  renderVerifyAidBody();
+  document.getElementById('modal-verify-aid').classList.add('open');
+}
+function closeVerifyAid(){ verifyingPID=null; document.getElementById('modal-verify-aid').classList.remove('open'); }
+
+function renderVerifyAidBody(extra){
+  const p=allPatients.find(x=>x.id===verifyingPID); if(!p) return;
+  const pill=MedicalAid.statusPill(p.medical_aid_status||'unverified');
+  const fmt=MedicalAid.validate(p.medical_aid_provider,p.medical_aid_number);
+  const checked=p.medical_aid_checked_at
+    ?`Last checked ${new Date(p.medical_aid_checked_at).toLocaleString('en-ZA')} by ${esc(p.medical_aid_checked_by||'—')} (${p.medical_aid_check_method==='api'?'API check':'manual'})`
+    :'Never checked';
+  document.getElementById('verify-aid-body').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <div><div style="font-size:11px;color:var(--ink2)">Patient</div><div style="font-weight:600">${esc(p.first_name+' '+p.last_name)}</div></div>
+      <div><div style="font-size:11px;color:var(--ink2)">Status</div><div><span class="pill ${pill.cls}">${pill.label}</span></div></div>
+      <div><div style="font-size:11px;color:var(--ink2)">Provider</div><div>${esc(p.medical_aid_provider||'—')}</div></div>
+      <div><div style="font-size:11px;color:var(--ink2)">Member Number</div><div style="font-family:'JetBrains Mono',monospace">${esc(p.medical_aid_number||'—')}</div></div>
+      <div><div style="font-size:11px;color:var(--ink2)">Plan / Option</div><div>${esc(p.medical_aid_plan||'—')}</div></div>
+      <div><div style="font-size:11px;color:var(--ink2)">Principal Member</div><div>${esc(p.medical_aid_principal||'Self')}</div></div>
+    </div>
+    <div style="font-size:12px;color:var(--ink2);margin-bottom:10px">${checked}</div>
+    <div style="font-size:12.5px;background:var(--grey-50,rgba(0,0,0,0.04));border-radius:8px;padding:10px 12px">${esc(fmt.message)}</div>
+    ${extra?`<div id="va-result" style="font-size:12.5px;border-radius:8px;padding:10px 12px;margin-top:10px;background:rgba(43,127,255,0.08)">${esc(extra)}</div>`:''}
+    <div style="font-size:11.5px;color:var(--ink2);margin-top:12px">“Mark Verified” records that you confirmed the membership with the scheme (phone or provider portal). “Run Check” validates the number format via the MedConsult verification service.</div>`;
+}
+
+async function runAidCheck(){
+  const p=allPatients.find(x=>x.id===verifyingPID); if(!p) return;
+  const btn=document.getElementById('va-check-btn');
+  btn.disabled=true; btn.textContent='Checking…';
+  let result;
+  try{
+    const {data,error}=await sb.functions.invoke('check-medical-aid',{body:{provider:p.medical_aid_provider,member_number:p.medical_aid_number,id_number:p.id_number}});
+    if(error) throw error;
+    result=data;
+  }catch(e){
+    // Edge function not deployed / unreachable — fall back to local format check
+    const v=MedicalAid.validate(p.medical_aid_provider,p.medical_aid_number);
+    result={status:v.status==='format_invalid'?'invalid':'unverified',message:v.message+' (Checked locally — verification service unreachable.)'};
+  }
+  btn.disabled=false; btn.textContent='Run Check';
+  const status=result.status==='valid'?'verified':result.status==='invalid'?'invalid':'unverified';
+  await persistAidStatus(p,status,'api');
+  renderVerifyAidBody(result.message||('Check result: '+status));
+  renderPatientTable(allPatients);
+}
+
+async function setAidStatus(status,method){
+  const p=allPatients.find(x=>x.id===verifyingPID); if(!p) return;
+  await persistAidStatus(p,status,method);
+  renderVerifyAidBody();
+  renderPatientTable(allPatients);
+  toast(status==='verified'?'Medical aid marked as verified':'Medical aid marked as invalid',status==='verified'?'success':'info');
+}
+
+async function persistAidStatus(p,status,method){
+  const meta=R.user?.user_metadata||{};
+  const by=meta.fn?`${meta.fn} ${meta.ln||''}`.trim():(R.user?.email||'reception');
+  const patch={medical_aid_status:status,medical_aid_checked_at:new Date().toISOString(),medical_aid_checked_by:by,medical_aid_check_method:method};
+  const {error}=await sb.from('patients').update(patch).eq('id',p.id);
+  if(error){ toast(error.message,'error'); return; }
+  Object.assign(p,patch);
+}
+
+function validateNpAid(){
+  const provider=document.getElementById('np-ma-provider').value.trim();
+  const number=document.getElementById('np-ma-number').value.trim();
+  const err=document.getElementById('err-np-ma-number');
+  if(!provider&&!number){ err.textContent=''; return true; }
+  const v=MedicalAid.validate(provider,number);
+  if(v.status==='format_invalid'){ err.textContent=v.message; return false; }
+  err.textContent = v.status==='unknown_scheme' ? v.message : '';
+  return true;
 }
 
 function filterPatients(val){
@@ -1112,7 +1221,7 @@ function openNewPatient(){
   (R.doctors||[]).forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=`Dr ${esc(d.first_name+' '+d.last_name)}`; sel.appendChild(o); });
   // Clear fields and errors
   ['np-fname','np-lname','np-dob','np-idnum','np-phone','np-email','np-address','np-ma-provider','np-ma-number','np-ma-plan','np-ma-principal'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  ['err-np-fname','err-np-lname','err-np-phone'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=''; });
+  ['err-np-fname','err-np-lname','err-np-phone','err-np-ma-number'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=''; });
   document.getElementById('modal-new-patient').classList.add('open');
 }
 function closeNewPatient(){ document.getElementById('modal-new-patient').classList.remove('open'); }
@@ -1125,6 +1234,9 @@ async function saveNewPatient(){
   if(!fname){ document.getElementById('err-np-fname').textContent='First name is required'; valid=false; } else { document.getElementById('err-np-fname').textContent=''; }
   if(!lname){ document.getElementById('err-np-lname').textContent='Last name is required'; valid=false; } else { document.getElementById('err-np-lname').textContent=''; }
   if(!phone){ document.getElementById('err-np-phone').textContent='Phone number is required'; valid=false; } else { document.getElementById('err-np-phone').textContent=''; }
+  const maProvider=document.getElementById('np-ma-provider').value.trim();
+  const maNumber=document.getElementById('np-ma-number').value.trim();
+  if((maProvider||maNumber)&&MedicalAid.validate(maProvider,maNumber).status==='format_invalid'){ validateNpAid(); valid=false; }
   if(!valid) return;
   const doctorId=document.getElementById('np-doctor').value||null;
   const payload={
@@ -1134,10 +1246,11 @@ async function saveNewPatient(){
     phone, email: document.getElementById('np-email').value.trim()||null,
     address: document.getElementById('np-address').value.trim()||null,
     doctor_id: doctorId,
-    medical_aid_provider: document.getElementById('np-ma-provider').value.trim()||null,
-    medical_aid_number: document.getElementById('np-ma-number').value.trim()||null,
+    medical_aid_provider: maProvider||null,
+    medical_aid_number: maNumber||null,
     medical_aid_plan: document.getElementById('np-ma-plan').value.trim()||null,
     medical_aid_principal: document.getElementById('np-ma-principal').value.trim()||null,
+    medical_aid_status: maProvider?'unverified':null,
   };
   setBtn('np-submit-btn','Saving…',true);
   const {data, error}=await sb.from('patients').insert(payload).select('*').single();
