@@ -13,6 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="medical-aid.js"></script>
 <style>
 :root {
   --azure:       #2b7fff;
@@ -1082,12 +1083,7 @@ async function renderProfile() {
       ${infoRow('Allergies',          pat.allerg  || 'None known')}
       ${infoRow('Chronic Conditions', pat.chronic || 'None')}
     </div>
-    <div class="info-block">
-      <div class="info-title">Medical Aid</div>
-      ${infoRow('Provider',      pat.aid     || 'None / Private')}
-      ${pat.aid ? infoRow('Member Number', pat.aidnum  || '—') : ''}
-      ${pat.aid ? infoRow('Plan / Option',  pat.aidplan || '—') : ''}
-    </div>
+    ${aidBlock(pat)}
     <div class="info-block">
       <div class="info-title">Contact</div>
       ${infoRow('Phone',    pat.ph   || '—')}
@@ -1102,6 +1098,41 @@ async function renderProfile() {
 }
 function infoRow(k, v) {
   return `<div class="info-row"><div class="info-key">${k}</div><div class="info-val">${esc(String(v))}</div></div>`;
+}
+
+// Two column-naming conventions coexist in the patients table depending on how the
+// record was created (short columns from seed data vs. long columns from the app's
+// own registration/reception flows) — read both so this renders correctly either way.
+function aidBlock(pat) {
+  const provider = pat.aid || pat.medical_aid_provider;
+  const number   = pat.aidnum || pat.medical_aid_number;
+  const plan     = pat.aidplan || pat.medical_aid_plan;
+  const status   = pat.medical_aid_status || (provider ? 'unverified' : null);
+
+  if (!provider) {
+    return `<div class="info-block">
+      <div class="info-title">Medical Aid</div>
+      ${infoRow('Provider', 'None / Private')}
+    </div>`;
+  }
+
+  const statusInfo = {
+    verified:   { cls: 'badge-confirmed', label: 'Verified',        note: 'Confirmed with your medical aid scheme.' },
+    unverified: { cls: 'badge-pending',   label: 'Unverified',      note: 'Not yet confirmed with your scheme. This has no effect on your care — reception will confirm it before or during your next claim.' },
+    invalid:    { cls: 'badge-cancelled', label: 'Needs attention', note: 'We couldn’t confirm these details. Please contact reception to update your medical aid information.' },
+  }[status];
+
+  return `<div class="info-block">
+    <div class="info-title">Medical Aid</div>
+    ${infoRow('Provider', provider)}
+    ${infoRow('Member Number', number || '—')}
+    ${infoRow('Plan / Option', plan || '—')}
+    <div class="info-row" style="align-items:center">
+      <div class="info-key">Verification</div>
+      <div class="info-val"><span class="badge ${statusInfo.cls}">${statusInfo.label}</span></div>
+    </div>
+    <div style="padding:0 16px 14px;font-size:12px;color:var(--ink2);line-height:1.5">${statusInfo.note}</div>
+  </div>`;
 }
 
 // ── LINK DOCTOR ───────────────────────────────────────
