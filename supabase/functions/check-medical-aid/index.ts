@@ -1,9 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // MedConsult — check-medical-aid Edge Function
 //
-// POST { provider: string, member_number: string, id_number?: string }
+// POST { provider: string, member_number: string, id_number?: string,
+//        dependant_code?: string }
 // →    { status: 'valid' | 'invalid' | 'unverified', scheme: string | null,
-//        message: string, checked_at: string }
+//        message: string, checked_at: string,
+//        id_check: { status: 'empty' | 'passport' | 'invalid' | 'valid', message: string } }
 //
 // Today this is a format-validation stub: it mirrors the client-side registry
 // in /medical-aid.js so the check cannot be bypassed by editing the page.
@@ -56,9 +58,30 @@ function findScheme(provider: string): Scheme | null {
   return null;
 }
 
+// SA ID number: YYMMDD SSSS C A Z — Luhn check digit. Keep in sync with /medical-aid.js
+function validateSAId(raw?: string): { status: 'empty' | 'passport' | 'invalid' | 'valid'; message: string } {
+  const id = (raw || '').replace(/\s+/g, '');
+  if (!id) return { status: 'empty', message: 'No ID number supplied.' };
+  if (/[A-Za-z]/.test(id)) return { status: 'passport', message: 'Passport or foreign ID — not checked.' };
+  if (!/^\d{13}$/.test(id)) return { status: 'invalid', message: 'SA ID numbers have 13 digits.' };
+  const yy = +id.slice(0, 2), mm = +id.slice(2, 4), dd = +id.slice(4, 6);
+  const year = (yy <= new Date().getFullYear() % 100 ? 2000 : 1900) + yy;
+  const d = new Date(Date.UTC(year, mm - 1, dd));
+  if (mm < 1 || mm > 12 || d.getUTCMonth() !== mm - 1 || d.getUTCDate() !== dd) return { status: 'invalid', message: 'ID date of birth is not a valid date.' };
+  if (!'012'.includes(id[10])) return { status: 'invalid', message: 'ID citizenship digit must be 0, 1 or 2.' };
+  let sum = 0;
+  for (let i = 0; i < 13; i++) {
+    let n = +id[12 - i];
+    if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; }
+    sum += n;
+  }
+  if (sum % 10 !== 0) return { status: 'invalid', message: 'ID check digit does not match — probably a typo.' };
+  return { status: 'valid', message: 'Valid SA ID number.' };
+}
+
 // Placeholder for the real eligibility check via a switching house.
 // Return null while no switch is configured so callers get 'unverified'.
-async function liveCheck(_scheme: Scheme | null, _memberNumber: string, _idNumber?: string): Promise<'valid' | 'invalid' | null> {
+async function liveCheck(_scheme: Scheme | null, _memberNumber: string, _idNumber?: string, _dependantCode?: string): Promise<'valid' | 'invalid' | null> {
   const url = Deno.env.get('SWITCH_API_URL');
   const key = Deno.env.get('SWITCH_API_KEY');
   if (!url || !key) return null;
@@ -80,7 +103,7 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
 
-  let body: { provider?: string; member_number?: string; id_number?: string };
+  let body: { provider?: string; member_number?: string; id_number?: string; dependant_code?: string };
   try {
     body = await req.json();
   } catch {
@@ -96,27 +119,36 @@ Deno.serve(async (req) => {
 
   const scheme = findScheme(provider);
   const fmt = scheme?.format ?? GENERIC;
+  const id_check = validateSAId(body.id_number);
+  const dep = (body.dependant_code || '').trim();
+  const notes = [
+    id_check.status === 'invalid' ? id_check.message : '',
+    dep && !/^\d{2}$/.test(dep) ? 'Dependant code should be two digits.' : '',
+  ].filter(Boolean).join(' ');
+  const withNotes = (m: string) => (notes ? `${m} ${notes}` : m);
 
   if (!fmt.re.test(memberNumber)) {
     return json({
       status: 'invalid',
       scheme: scheme?.name ?? null,
-      message: `Member number does not match the expected format for ${scheme?.name ?? provider} (${fmt.hint}).`,
+      message: withNotes(`Member number does not match the expected format for ${scheme?.name ?? provider} (${fmt.hint}).`),
       checked_at,
+      id_check,
     });
   }
 
-  const live = await liveCheck(scheme, memberNumber, body.id_number);
+  const live = await liveCheck(scheme, memberNumber, body.id_number, dep);
   if (live) {
-    return json({ status: live, scheme: scheme?.name ?? null, message: `Live eligibility check returned: ${live}.`, checked_at });
+    return json({ status: live, scheme: scheme?.name ?? null, message: withNotes(`Live eligibility check returned: ${live}.`), checked_at, id_check });
   }
 
   return json({
     status: 'unverified',
     scheme: scheme?.name ?? null,
-    message: scheme
+    message: withNotes(scheme
       ? `Format OK for ${scheme.name}. Live verification is not connected yet — confirm with the scheme and mark the membership verified manually.`
-      : `Format OK, but "${provider}" is not in the scheme registry. Confirm the scheme name and verify manually.`,
+      : `Format OK, but "${provider}" is not in the scheme registry. Confirm the scheme name and verify manually.`),
     checked_at,
+    id_check,
   });
 });

@@ -181,6 +181,23 @@ tr:hover td{background:var(--grey-50)}
 .form-field input:focus,.form-field select:focus,.form-field textarea:focus{border-color:var(--azure);box-shadow:0 0 0 3px var(--azure-dim)}
 .form-field textarea{resize:vertical;min-height:80px}
 .form-field .field-error{display:block;font-size:11px;color:var(--danger);margin-top:4px}
+.form-field .field-hint{display:block;font-size:11px;margin-top:4px;line-height:1.45}
+.fh-ok{color:var(--success)}.fh-warn{color:var(--warning)}.fh-bad{color:var(--danger)}.fh-muted{color:var(--ink2)}
+.va-sec{border-top:1px solid var(--border);padding-top:14px;margin-top:14px}
+.va-sec-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--ink2);margin-bottom:8px}
+.va-checks{list-style:none;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.va-checks li{display:flex;gap:8px;line-height:1.45}
+.va-checks .ic{flex-shrink:0;width:16px;text-align:center;font-weight:700}
+.va-methods{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.va-method{border:1px solid var(--border);background:var(--white);border-radius:20px;padding:6px 12px;font-size:12px;cursor:pointer;color:var(--ink)}
+.va-method.on{border-color:var(--azure);background:var(--azure-dim);color:var(--azure);font-weight:600}
+.va-contact{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.va-contact a{color:var(--azure);font-weight:600;text-decoration:none}
+.va-card-thumb{width:120px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block}
+.va-hist{font-size:12px;color:var(--ink2);display:flex;flex-direction:column;gap:4px}
+.va-mini-input{border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;font-size:13px;width:100%}
+.aid-filter-bar{display:flex;gap:8px;margin-bottom:12px}
+.aid-filter-bar .btn.on{background:var(--warning-bg);color:var(--warning);border-color:transparent}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .modal-foot{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
 
@@ -545,11 +562,12 @@ tr:hover td{background:var(--grey-50)}
       <div class="form-row">
         <div class="form-field">
           <label>Date of Birth</label>
-          <input type="date" id="np-dob">
+          <input type="date" id="np-dob" onchange="validateNpId()">
         </div>
         <div class="form-field">
           <label>ID Number</label>
-          <input type="text" id="np-idnum" placeholder="SA ID or passport">
+          <input type="text" id="np-idnum" placeholder="SA ID or passport" oninput="validateNpId()">
+          <span class="field-hint" id="hint-np-idnum"></span>
         </div>
       </div>
       <div class="form-row">
@@ -592,9 +610,14 @@ tr:hover td{background:var(--grey-50)}
           <input type="text" id="np-ma-plan" placeholder="e.g. Classic Comprehensive">
         </div>
         <div class="form-field">
-          <label>Principal Member</label>
-          <input type="text" id="np-ma-principal" placeholder="If different from patient">
+          <label>Dependant Code</label>
+          <input type="text" id="np-ma-dep" placeholder="00 = main member" maxlength="2" inputmode="numeric" oninput="validateNpDep()">
+          <span class="field-hint" id="hint-np-ma-dep"></span>
         </div>
+      </div>
+      <div class="form-field">
+        <label>Principal Member</label>
+        <input type="text" id="np-ma-principal" placeholder="If different from patient" oninput="validateNpDep()">
       </div>
     </div>
     <div class="modal-foot">
@@ -624,9 +647,9 @@ tr:hover td{background:var(--grey-50)}
     <div class="modal-body" id="verify-aid-body"></div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeVerifyAid()">Close</button>
-      <button class="btn btn-secondary" id="va-invalid-btn" onclick="setAidStatus('invalid','manual')">Mark Invalid</button>
+      <button class="btn btn-secondary" id="va-invalid-btn" onclick="setAidStatus('invalid')">Mark Invalid</button>
       <button class="btn btn-secondary" id="va-check-btn" onclick="runAidCheck()">Run Check</button>
-      <button class="btn btn-primary" id="va-verify-btn" onclick="setAidStatus('verified','manual')">Mark Verified</button>
+      <button class="btn btn-primary" id="va-verify-btn" onclick="setAidStatus('verified')">Mark Verified</button>
     </div>
   </div>
 </div>
@@ -642,6 +665,7 @@ let weekOffset = 0;
 let calSelectedDay = null;
 let editingApptId = null;
 let allPatients = [];
+let aidFilter = false;
 
 /* ── HELPERS ───────────────────────────────────────────────── */
 function esc(s){ const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
@@ -844,7 +868,7 @@ async function loadDashboard(){
   document.getElementById('dash-heading').textContent=`${greeting()}, ${(R.user?.user_metadata?.fn||'').split(' ')[0]||'Welcome'}`;
 
   const {data:appts}=await sb.from('appointments')
-    .select('id,time,status,type,patients(first_name,last_name),doctors(first_name,last_name)')
+    .select('id,time,status,type,patients(first_name,last_name,medical_aid_provider,medical_aid_status,medical_aid_checked_at),doctors(first_name,last_name)')
     .eq('date',today)
     .order('time');
 
@@ -877,7 +901,7 @@ function renderDashAppts(appts, filter=''){
     <div class="appt-list-item tbl-clickable" onclick="openApptDetail('${a.id}')">
       <div class="appt-time">${fmtTime(a.time)}</div>
       <div style="flex:1">
-        <div class="appt-name">${esc(a.patients?.first_name+' '+a.patients?.last_name)}</div>
+        <div class="appt-name">${esc(a.patients?.first_name+' '+a.patients?.last_name)}${MedicalAid.needsCheck(a.patients?.medical_aid_provider,a.patients?.medical_aid_status,a.patients?.medical_aid_checked_at)?' <span class="pill pill-yellow" title="Medical aid not verified in the last '+MedicalAid.RECHECK_DAYS+' days — check before billing">Aid: check</span>':''}</div>
         <div class="appt-doctor">Dr. ${esc(a.doctors?.first_name+' '+a.doctors?.last_name)} · <span class="appt-type">${capitalise(a.type)}</span></div>
       </div>
       ${statusPill(a.status)}
@@ -895,7 +919,10 @@ async function loadDoctorsCache(){
   populateDoctorSelect();
 }
 async function loadPatientsCache(){
-  const {data}=await sb.from('patients').select('id,first_name,last_name,dob,id_number,phone,email,address,medical_aid_provider,medical_aid_number,medical_aid_plan,medical_aid_principal,medical_aid_status,medical_aid_checked_at,medical_aid_checked_by,medical_aid_check_method,doctor_id').order('last_name');
+  const base='id,first_name,last_name,dob,id_number,phone,email,address,medical_aid_provider,medical_aid_number,medical_aid_plan,medical_aid_principal,medical_aid_status,medical_aid_checked_at,medical_aid_checked_by,medical_aid_check_method,doctor_id';
+  let {data,error}=await sb.from('patients').select(base+',medical_aid_dependant_code,medical_aid_check_ref,medical_aid_card_path').order('last_name');
+  // Columns from medical_aid_workflow.sql not added yet — load without them
+  if(error) ({data}=await sb.from('patients').select(base).order('last_name'));
   allPatients=data||[];
 }
 
@@ -1101,16 +1128,20 @@ async function cancelAppt(id){
 /* ── PATIENTS ───────────────────────────────────────────────── */
 async function loadPatients(){
   document.getElementById('pat-list-wrap').style.display='block';
-  document.getElementById('pat-detail').style.display='none';
   if(allPatients.length){ renderPatientTable(allPatients); return; }
   await loadPatientsCache();
   renderPatientTable(allPatients);
 }
 
+function patNeedsCheck(p){ return MedicalAid.needsCheck(p.medical_aid_provider,p.medical_aid_status,p.medical_aid_checked_at); }
+function toggleAidFilter(){ aidFilter=!aidFilter; filterPatients(document.getElementById('pat-search').value); }
 function renderPatientTable(pts){
   const wrap=document.getElementById('pat-list-wrap');
-  if(!pts.length){ wrap.innerHTML=`<div class="empty"><div class="empty-icon">👤</div><div class="empty-title">No patients found</div><div class="empty-sub">Use the + New Patient button to register a patient</div></div>`; return; }
-  wrap.innerHTML=`<div class="tbl-wrap"><table>
+  const due=allPatients.filter(patNeedsCheck).length;
+  const bar=`<div class="aid-filter-bar"><button class="btn btn-secondary btn-sm${aidFilter?' on':''}" onclick="toggleAidFilter()" title="Patients on medical aid without a verification in the last ${MedicalAid.RECHECK_DAYS} days">⚠ Needs medical aid check (${due})</button></div>`;
+  if(aidFilter) pts=pts.filter(patNeedsCheck);
+  if(!pts.length){ wrap.innerHTML=bar+`<div class="empty"><div class="empty-icon">👤</div><div class="empty-title">${aidFilter?'All medical aids are up to date':'No patients found'}</div><div class="empty-sub">${aidFilter?'Nothing needs checking right now':'Use the + New Patient button to register a patient'}</div></div>`; return; }
+  wrap.innerHTML=bar+`<div class="tbl-wrap"><table>
     <thead><tr><th>Patient</th><th>Phone</th><th>Email</th><th>Medical Aid</th><th>Aid Status</th></tr></thead>
     <tbody>${pts.map(p=>`<tr>
       <td><strong>${esc(p.first_name+' '+p.last_name)}</strong></td>
@@ -1125,47 +1156,192 @@ function renderPatientTable(pts){
 /* ── MEDICAL AID VERIFICATION ───────────────────────────────── */
 function aidStatusCell(p){
   if(!p.medical_aid_provider) return '<span style="color:var(--ink2)">—</span>';
-  const pill=MedicalAid.statusPill(p.medical_aid_status||'unverified');
+  const pill=MedicalAid.statusPill(p.medical_aid_status||'unverified',p.medical_aid_checked_at);
   return `<span class="pill ${pill.cls}">${pill.label}</span> <button class="btn btn-secondary btn-sm" style="margin-left:6px" onclick="showVerifyAid('${p.id}')">Verify</button>`;
 }
 
+const CARD_BUCKET='medical-aid-cards';
 let verifyingPID=null;
-function showVerifyAid(pid){
+let VA={};
+R.schemeContacts={};
+
+function vaPatient(){ return allPatients.find(x=>x.id===verifyingPID); }
+function vaSchemeKey(p){ return MedicalAid.findScheme(p.medical_aid_provider)?.name||(p.medical_aid_provider||'').trim(); }
+function safeUrl(u){ u=String(u||'').trim(); if(!u) return ''; if(!/^https?:\/\//i.test(u)) u='https://'+u; return /^https?:\/\/[^\s"'<>]+$/i.test(u)?u:''; }
+
+async function showVerifyAid(pid){
   verifyingPID=pid;
+  VA={method:'phone',ref:'',editContact:false,editDetails:false,history:null,cardUrl:null,extra:''};
   renderVerifyAidBody();
   document.getElementById('modal-verify-aid').classList.add('open');
+  const p=vaPatient(); if(!p) return;
+  await Promise.all([loadSchemeContact(vaSchemeKey(p)),loadAidHistory(p),loadCardUrl(p)]);
+  if(verifyingPID===pid) renderVerifyAidBody();
 }
 function closeVerifyAid(){ verifyingPID=null; document.getElementById('modal-verify-aid').classList.remove('open'); }
 
-function renderVerifyAidBody(extra){
-  const p=allPatients.find(x=>x.id===verifyingPID); if(!p) return;
-  const pill=MedicalAid.statusPill(p.medical_aid_status||'unverified');
+async function loadSchemeContact(key){
+  if(!key||key in R.schemeContacts) return;
+  const {data,error}=await sb.from('practice_scheme_contacts').select('phone,portal_url,notes').eq('practice_id',R.practice?.id).eq('scheme',key).maybeSingle();
+  if(error) console.warn('scheme contacts unavailable',error.message);
+  R.schemeContacts[key]=data||null;
+}
+async function loadAidHistory(p){
+  const {data,error}=await sb.from('medical_aid_checks').select('status,method,reference,message,checked_by,created_at').eq('patient_id',p.id).order('created_at',{ascending:false}).limit(5);
+  if(error) console.warn('check history unavailable',error.message);
+  VA.history=data||[];
+}
+async function loadCardUrl(p){
+  VA.cardUrl=null;
+  if(!p.medical_aid_card_path) return;
+  const {data}=await sb.storage.from(CARD_BUCKET).createSignedUrl(p.medical_aid_card_path,600);
+  VA.cardUrl=data?.signedUrl||null;
+}
+
+function vaCheckItem(kind,text){
+  const ic={ok:['✓','fh-ok'],warn:['!','fh-warn'],bad:['✗','fh-bad'],info:['·','fh-muted']}[kind];
+  return `<li><span class="ic ${ic[1]}">${ic[0]}</span><span>${esc(text)}</span></li>`;
+}
+
+function renderVerifyAidBody(){
+  const p=vaPatient(); if(!p) return;
+  const pill=MedicalAid.statusPill(p.medical_aid_status||'unverified',p.medical_aid_checked_at);
   const fmt=MedicalAid.validate(p.medical_aid_provider,p.medical_aid_number);
+  const idv=MedicalAid.validateSAId(p.id_number,{dob:p.dob||''});
+  const dep=MedicalAid.validateDependantCode(p.medical_aid_dependant_code,p.medical_aid_principal);
+  const key=vaSchemeKey(p);
+  const contact=R.schemeContacts[key];
+  const methodName=MedicalAid.METHODS[p.medical_aid_check_method]||'manual';
   const checked=p.medical_aid_checked_at
-    ?`Last checked ${new Date(p.medical_aid_checked_at).toLocaleString('en-ZA')} by ${esc(p.medical_aid_checked_by||'—')} (${p.medical_aid_check_method==='api'?'API check':'manual'})`
+    ?`Last checked ${new Date(p.medical_aid_checked_at).toLocaleString('en-ZA')} by ${esc(p.medical_aid_checked_by||'—')} · ${esc(methodName)}${p.medical_aid_check_ref?` · ref ${esc(p.medical_aid_check_ref)}`:''}`
     :'Never checked';
+
+  const checks=[
+    vaCheckItem(fmt.status==='format_ok'?'ok':fmt.status==='format_invalid'?'bad':'warn',fmt.message),
+    idv.status==='empty'?vaCheckItem('warn','No ID number captured — most schemes ask for it.')
+      :vaCheckItem(idv.status==='valid'?(idv.warnings.length?'warn':'ok'):idv.status==='invalid'?'bad':'info',idv.message),
+    ...(idv.warnings||[]).map(w=>vaCheckItem('warn',w)),
+    vaCheckItem(dep.status==='ok'?'ok':dep.status==='invalid'?'bad':'warn',dep.message)
+  ].join('');
+
+  const details=VA.editDetails?`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">
+      <input class="va-mini-input" id="va-e-num" placeholder="Member number" value="${esc(p.medical_aid_number||'')}">
+      <input class="va-mini-input" id="va-e-dep" placeholder="Dependant code" maxlength="2" value="${esc(p.medical_aid_dependant_code||'')}">
+      <input class="va-mini-input" id="va-e-id" placeholder="ID number" value="${esc(p.id_number||'')}">
+      <input class="va-mini-input" id="va-e-principal" placeholder="Principal member" value="${esc(p.medical_aid_principal||'')}">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary btn-sm" onclick="saveAidDetails()">Save details</button><button class="btn btn-secondary btn-sm" onclick="VA.editDetails=false;renderVerifyAidBody()">Cancel</button></div>`
+    :`<button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="VA.editDetails=true;renderVerifyAidBody()">Fix details</button>`;
+
+  const phone=contact?.phone?`<a href="tel:${esc(contact.phone.replace(/[^\d+]/g,''))}">📞 ${esc(contact.phone)}</a>`:'';
+  const portal=safeUrl(contact?.portal_url);
+  const contactBody=VA.editContact?`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <input class="va-mini-input" id="va-c-phone" placeholder="Provider phone line" value="${esc(contact?.phone||'')}">
+      <input class="va-mini-input" id="va-c-portal" placeholder="Provider portal link" value="${esc(contact?.portal_url||'')}">
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-primary btn-sm" onclick="saveSchemeContact()">Save for the practice</button><button class="btn btn-secondary btn-sm" onclick="VA.editContact=false;renderVerifyAidBody()">Cancel</button></div>`
+    :`<div class="va-contact">${phone}${portal?`<a href="${esc(portal)}" target="_blank" rel="noopener">🌐 Provider portal</a>`:''}${!phone&&!portal?'<span style="color:var(--ink2)">No contact saved for this scheme yet.</span>':''}
+      <button class="btn btn-secondary btn-sm" onclick="VA.editContact=true;renderVerifyAidBody()">${contact?'Edit':'Add contact'}</button>
+      <a href="${esc(MedicalAid.contactSearchUrl(key))}" target="_blank" rel="noopener" style="font-weight:400;font-size:12px">Find it online ↗</a></div>`;
+
+  const methods=['phone','portal','card'].map(m=>`<button class="va-method${VA.method===m?' on':''}" onclick="VA.method='${m}';renderVerifyAidBody()">${MedicalAid.METHODS[m]}</button>`).join('');
+  const refLabel=VA.method==='phone'?'Call reference number':VA.method==='portal'?'Portal reference / confirmation':'Note (optional)';
+  const card=`<div style="display:flex;gap:12px;align-items:center;margin-top:10px">
+      ${VA.cardUrl?`<a href="${esc(VA.cardUrl)}" target="_blank" rel="noopener"><img class="va-card-thumb" src="${esc(VA.cardUrl)}" alt="Membership card"></a>`:p.medical_aid_card_path?'<span style="font-size:12px;color:var(--ink2)">Card photo on file</span>':''}
+      <label class="btn btn-secondary btn-sm" style="cursor:pointer">${p.medical_aid_card_path?'Replace card photo':'📷 Add card photo'}<input type="file" accept="image/*" style="display:none" onchange="uploadCardPhoto(this.files[0])"></label>
+    </div>`;
+
+  const hist=VA.history===null?'<div class="va-hist">Loading…</div>'
+    :VA.history.length?`<div class="va-hist">${VA.history.map(h=>{const pl=MedicalAid.statusPill(h.status);return `<div><span class="pill ${pl.cls}" style="font-size:10px;padding:2px 8px">${pl.label}</span> ${new Date(h.created_at).toLocaleString('en-ZA',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})} · ${esc(MedicalAid.METHODS[h.method]||h.method)}${h.reference?` · ref ${esc(h.reference)}`:''} · ${esc(h.checked_by||'')}</div>`}).join('')}</div>`
+    :'<div class="va-hist">No checks recorded yet.</div>';
+
   document.getElementById('verify-aid-body').innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       <div><div style="font-size:11px;color:var(--ink2)">Patient</div><div style="font-weight:600">${esc(p.first_name+' '+p.last_name)}</div></div>
       <div><div style="font-size:11px;color:var(--ink2)">Status</div><div><span class="pill ${pill.cls}">${pill.label}</span></div></div>
       <div><div style="font-size:11px;color:var(--ink2)">Provider</div><div>${esc(p.medical_aid_provider||'—')}</div></div>
-      <div><div style="font-size:11px;color:var(--ink2)">Member Number</div><div style="font-family:'JetBrains Mono',monospace">${esc(p.medical_aid_number||'—')}</div></div>
+      <div><div style="font-size:11px;color:var(--ink2)">Member Number · Dependant</div><div style="font-family:'JetBrains Mono',monospace">${esc(p.medical_aid_number||'—')} · ${esc(p.medical_aid_dependant_code||'—')}</div></div>
       <div><div style="font-size:11px;color:var(--ink2)">Plan / Option</div><div>${esc(p.medical_aid_plan||'—')}</div></div>
       <div><div style="font-size:11px;color:var(--ink2)">Principal Member</div><div>${esc(p.medical_aid_principal||'Self')}</div></div>
     </div>
-    <div style="font-size:12px;color:var(--ink2);margin-bottom:10px">${checked}</div>
-    <div style="font-size:12.5px;background:var(--grey-50,rgba(0,0,0,0.04));border-radius:8px;padding:10px 12px">${esc(fmt.message)}</div>
-    ${extra?`<div id="va-result" style="font-size:12.5px;border-radius:8px;padding:10px 12px;margin-top:10px;background:rgba(43,127,255,0.08)">${esc(extra)}</div>`:''}
-    <div style="font-size:11.5px;color:var(--ink2);margin-top:12px">“Mark Verified” records that you confirmed the membership with the scheme (phone or provider portal). “Run Check” validates the number format via the MedConsult verification service.</div>`;
+    <div style="font-size:12px;color:var(--ink2);margin-top:10px">${checked}</div>
+    ${VA.extra?`<div style="font-size:12.5px;border-radius:8px;padding:10px 12px;margin-top:10px;background:rgba(43,127,255,0.08)">${esc(VA.extra)}</div>`:''}
+
+    <div class="va-sec"><div class="va-sec-title">Automatic checks</div><ul class="va-checks">${checks}</ul>${details}</div>
+
+    <div class="va-sec"><div class="va-sec-title">Contact ${esc(key||'the scheme')}</div>${contactBody}</div>
+
+    <div class="va-sec"><div class="va-sec-title">How did you confirm it?</div>
+      <div class="va-methods">${methods}</div>
+      <input class="va-mini-input" id="va-ref" placeholder="${refLabel}" value="${esc(VA.ref)}" oninput="VA.ref=this.value">
+      ${card}
+    </div>
+
+    <div class="va-sec"><div class="va-sec-title">Check history</div>${hist}</div>
+    <div style="font-size:11.5px;color:var(--ink2);margin-top:12px">Verification lasts ${MedicalAid.RECHECK_DAYS} days, then the patient is flagged for a re-check. “Run Check” uses the MedConsult verification service; until a scheme connection is live it confirms the details are well-formed, not that the membership is active.</div>`;
+}
+
+async function saveSchemeContact(){
+  const p=vaPatient(); if(!p) return;
+  const key=vaSchemeKey(p);
+  const phone=document.getElementById('va-c-phone').value.trim();
+  const portalRaw=document.getElementById('va-c-portal').value.trim();
+  const portal=safeUrl(portalRaw);
+  if(portalRaw&&!portal){ toast('That portal link does not look like a web address','error'); return; }
+  const row={practice_id:R.practice?.id,scheme:key,phone:phone||null,portal_url:portal||null,updated_at:new Date().toISOString()};
+  const {error}=await sb.from('practice_scheme_contacts').upsert(row);
+  if(error){ toast(error.message,'error'); return; }
+  R.schemeContacts[key]={phone:row.phone,portal_url:row.portal_url};
+  VA.editContact=false; renderVerifyAidBody();
+  toast(`Saved ${key} contact for the practice`,'success');
+}
+
+async function saveAidDetails(){
+  const p=vaPatient(); if(!p) return;
+  const num=document.getElementById('va-e-num').value.trim();
+  const dep=document.getElementById('va-e-dep').value.trim();
+  const idn=document.getElementById('va-e-id').value.trim();
+  const principal=document.getElementById('va-e-principal').value.trim();
+  const fmt=MedicalAid.validate(p.medical_aid_provider,num);
+  if(fmt.status==='format_invalid'){ toast(fmt.message,'error'); return; }
+  if(MedicalAid.validateSAId(idn).status==='invalid'){ toast(MedicalAid.validateSAId(idn).message,'error'); return; }
+  if(MedicalAid.validateDependantCode(dep,principal).status==='invalid'){ toast('Dependant code is two digits, e.g. 00 or 01','error'); return; }
+  const patch={medical_aid_number:num,id_number:idn||null,medical_aid_principal:principal||null,medical_aid_dependant_code:dep||null};
+  if(num!==(p.medical_aid_number||'')||dep!==(p.medical_aid_dependant_code||'')) patch.medical_aid_status='unverified';
+  const {error}=await sb.from('patients').update(patch).eq('id',p.id);
+  if(error){ toast(error.message,'error'); return; }
+  Object.assign(p,patch);
+  VA.editDetails=false; renderVerifyAidBody(); renderPatientTable(allPatients);
+  toast(patch.medical_aid_status?'Details saved — membership needs verifying again':'Details saved','success');
+}
+
+async function uploadCardPhoto(file){
+  const p=vaPatient(); if(!p||!file) return;
+  if(!/^image\//.test(file.type)){ toast('Please choose a photo of the card','error'); return; }
+  if(file.size>5*1024*1024){ toast('Photo is too large (max 5 MB)','error'); return; }
+  const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+  const path=`${R.practice?.id}/${p.id}/${Date.now()}.${ext}`;
+  toast('Uploading card photo…','info');
+  const {error}=await sb.storage.from(CARD_BUCKET).upload(path,file,{contentType:file.type,upsert:false});
+  if(error){ toast(error.message,'error'); return; }
+  const {error:ue}=await sb.from('patients').update({medical_aid_card_path:path}).eq('id',p.id);
+  if(ue){ toast(ue.message,'error'); return; }
+  p.medical_aid_card_path=path;
+  await loadCardUrl(p);
+  VA.method='card';
+  renderVerifyAidBody();
+  toast('Card photo saved','success');
 }
 
 async function runAidCheck(){
-  const p=allPatients.find(x=>x.id===verifyingPID); if(!p) return;
+  const p=vaPatient(); if(!p) return;
   const btn=document.getElementById('va-check-btn');
   btn.disabled=true; btn.textContent='Checking…';
   let result;
   try{
-    const {data,error}=await sb.functions.invoke('check-medical-aid',{body:{provider:p.medical_aid_provider,member_number:p.medical_aid_number,id_number:p.id_number}});
+    const {data,error}=await sb.functions.invoke('check-medical-aid',{body:{provider:p.medical_aid_provider,member_number:p.medical_aid_number,id_number:p.id_number,dependant_code:p.medical_aid_dependant_code}});
     if(error) throw error;
     result=data;
   }catch(e){
@@ -1175,26 +1351,62 @@ async function runAidCheck(){
   }
   btn.disabled=false; btn.textContent='Run Check';
   const status=result.status==='valid'?'verified':result.status==='invalid'?'invalid':'unverified';
-  await persistAidStatus(p,status,'api');
-  renderVerifyAidBody(result.message||('Check result: '+status));
+  await persistAidStatus(p,status,'api','',result.message);
+  VA.extra=result.message||('Check result: '+status);
+  await loadAidHistory(p);
+  renderVerifyAidBody();
   renderPatientTable(allPatients);
 }
 
-async function setAidStatus(status,method){
-  const p=allPatients.find(x=>x.id===verifyingPID); if(!p) return;
-  await persistAidStatus(p,status,method);
+async function setAidStatus(status){
+  const p=vaPatient(); if(!p) return;
+  const ref=(VA.ref||'').trim();
+  if(status==='verified'){
+    if(VA.method==='card'&&!p.medical_aid_card_path){ toast('Add a photo of the membership card first','error'); return; }
+    if(VA.method!=='card'&&!ref&&!confirm('No reference number captured. Schemes give one on the phone or portal — it protects the practice if a claim is later rejected.\n\nMark as verified anyway?')) return;
+  }
+  const ok=await persistAidStatus(p,status,VA.method,ref,'');
+  if(!ok) return;
+  VA.ref=''; VA.extra='';
+  await loadAidHistory(p);
   renderVerifyAidBody();
   renderPatientTable(allPatients);
   toast(status==='verified'?'Medical aid marked as verified':'Medical aid marked as invalid',status==='verified'?'success':'info');
 }
 
-async function persistAidStatus(p,status,method){
+async function persistAidStatus(p,status,method,ref,message){
   const meta=R.user?.user_metadata||{};
   const by=meta.fn?`${meta.fn} ${meta.ln||''}`.trim():(R.user?.email||'reception');
-  const patch={medical_aid_status:status,medical_aid_checked_at:new Date().toISOString(),medical_aid_checked_by:by,medical_aid_check_method:method};
+  const now=new Date().toISOString();
+  const patch={medical_aid_status:status,medical_aid_checked_at:now,medical_aid_checked_by:by,medical_aid_check_method:method,medical_aid_check_ref:ref||null};
   const {error}=await sb.from('patients').update(patch).eq('id',p.id);
-  if(error){ toast(error.message,'error'); return; }
+  if(error){ toast(error.message,'error'); return false; }
   Object.assign(p,patch);
+  const {error:he}=await sb.from('medical_aid_checks').insert({patient_id:p.id,status,method,reference:ref||null,message:message||null,checked_by:by});
+  if(he) console.warn('check history not saved',he.message);
+  return true;
+}
+
+function validateNpId(){
+  const idEl=document.getElementById('np-idnum'), dobEl=document.getElementById('np-dob'), hint=document.getElementById('hint-np-idnum');
+  let v=MedicalAid.validateSAId(idEl.value,{dob:dobEl.value});
+  if(v.status==='valid'&&!dobEl.value){ dobEl.value=v.dob; v=MedicalAid.validateSAId(idEl.value,{dob:v.dob}); }
+  const cls={valid:v.warnings?.length?'fh-warn':'fh-ok',invalid:'fh-bad',passport:'fh-muted',empty:''}[v.status];
+  hint.className='field-hint '+cls;
+  hint.textContent=[v.message,...(v.warnings||[])].filter(Boolean).join(' ');
+  return v.status!=='invalid';
+}
+
+function validateNpDep(){
+  const code=document.getElementById('np-ma-dep').value.trim();
+  const principal=document.getElementById('np-ma-principal').value.trim();
+  const hint=document.getElementById('hint-np-ma-dep');
+  const hasAid=document.getElementById('np-ma-provider').value.trim();
+  const v=MedicalAid.validateDependantCode(code,principal);
+  if(!hasAid&&!code){ hint.textContent=''; return true; }
+  hint.className='field-hint '+({ok:'fh-ok',invalid:'fh-bad',warn:'fh-warn',empty:'fh-muted'}[v.status]);
+  hint.textContent=v.message;
+  return v.status!=='invalid';
 }
 
 function validateNpAid(){
@@ -1209,7 +1421,7 @@ function validateNpAid(){
 }
 
 function filterPatients(val){
-  if(!val){ renderPatientTable(allPatients); return; }
+  if(!val){ renderPatientTable(allPatients); return; }  // renderPatientTable applies the aid filter
   const q=val.toLowerCase();
   renderPatientTable(allPatients.filter(p=>`${p.first_name} ${p.last_name} ${p.phone||''} ${p.email||''}`.toLowerCase().includes(q)));
 }
@@ -1220,8 +1432,8 @@ function openNewPatient(){
   sel.innerHTML='<option value="">Unassigned — assign later</option>';
   (R.doctors||[]).forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=`Dr ${esc(d.first_name+' '+d.last_name)}`; sel.appendChild(o); });
   // Clear fields and errors
-  ['np-fname','np-lname','np-dob','np-idnum','np-phone','np-email','np-address','np-ma-provider','np-ma-number','np-ma-plan','np-ma-principal'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-  ['err-np-fname','err-np-lname','err-np-phone','err-np-ma-number'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=''; });
+  ['np-fname','np-lname','np-dob','np-idnum','np-phone','np-email','np-address','np-ma-provider','np-ma-number','np-ma-plan','np-ma-dep','np-ma-principal'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['err-np-fname','err-np-lname','err-np-phone','err-np-ma-number','hint-np-idnum','hint-np-ma-dep'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=''; });
   document.getElementById('modal-new-patient').classList.add('open');
 }
 function closeNewPatient(){ document.getElementById('modal-new-patient').classList.remove('open'); }
@@ -1237,6 +1449,9 @@ async function saveNewPatient(){
   const maProvider=document.getElementById('np-ma-provider').value.trim();
   const maNumber=document.getElementById('np-ma-number').value.trim();
   if((maProvider||maNumber)&&MedicalAid.validate(maProvider,maNumber).status==='format_invalid'){ validateNpAid(); valid=false; }
+  if(!validateNpId()) valid=false;
+  if(!validateNpDep()) valid=false;
+  const maDep=document.getElementById('np-ma-dep').value.trim();
   if(!valid) return;
   const doctorId=document.getElementById('np-doctor').value||null;
   const payload={
@@ -1252,6 +1467,7 @@ async function saveNewPatient(){
     medical_aid_principal: document.getElementById('np-ma-principal').value.trim()||null,
     medical_aid_status: maProvider?'unverified':null,
   };
+  if(maDep) payload.medical_aid_dependant_code=maDep;
   setBtn('np-submit-btn','Saving…',true);
   const {data, error}=await sb.from('patients').insert(payload).select('*').single();
   setBtn('np-submit-btn','Register Patient',false);
