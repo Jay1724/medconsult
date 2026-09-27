@@ -588,7 +588,7 @@ tr:hover td{background:var(--grey-50)}
       <div class="form-field">
         <label>Assigned Doctor</label>
         <select id="np-doctor">
-          <option value="">Unassigned — assign later</option>
+          <option value="">Select a doctor…</option>
         </select>
       </div>
       <div class="section-title" style="margin-top:20px">Medical Aid</div>
@@ -667,6 +667,18 @@ let editingApptId = null;
 let allPatients = [];
 let aidFilter = false;
 
+/* ── LIVE SCHEMA COLUMN MAP ─────────────────────────────────
+   The page uses medical_aid_* / date / time names; the database columns are
+   aid_* / appt_date / appt_time. PostgREST aliases (alias:column) map them. */
+const PAT_BASE='id,first_name,last_name,dob,id_number,phone,email,address,doctor_id,medical_aid_provider:aid_provider,medical_aid_number:aid_number,medical_aid_plan:aid_plan,medical_aid_principal:principal';
+const PAT_AID='medical_aid_status:aid_status,medical_aid_checked_at:aid_checked_at,medical_aid_checked_by:aid_checked_by,medical_aid_check_method:aid_check_method,medical_aid_check_ref:aid_check_ref,medical_aid_dependant_code:aid_dependant_code,medical_aid_card_path:aid_card_path';
+const AID_COLS={aid_status:'medical_aid_status',aid_checked_at:'medical_aid_checked_at',aid_checked_by:'medical_aid_checked_by',aid_check_method:'medical_aid_check_method',aid_check_ref:'medical_aid_check_ref',aid_dependant_code:'medical_aid_dependant_code',aid_card_path:'medical_aid_card_path',aid_number:'medical_aid_number',principal:'medical_aid_principal',id_number:'id_number'};
+// Copy an RPC result (database column names) onto a patient object (page names)
+function applyAidResult(p,res){ Object.entries(res||{}).forEach(([k,v])=>{ if(AID_COLS[k]) p[AID_COLS[k]]=v; }); }
+// Run a select that includes the medical aid workflow columns; if
+// medical_aid_workflow.sql hasn't been run yet, retry without them.
+async function withAidFallback(run){ let res=await run(true); if(res.error) res=await run(false); return res; }
+
 /* ── HELPERS ───────────────────────────────────────────────── */
 function esc(s){ const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
 function setBtn(id,label,busy){ const b=document.getElementById(id); if(!b) return; b.textContent=label; b.disabled=!!busy; }
@@ -675,7 +687,7 @@ document.getElementById('ma-scheme-list').innerHTML=MedicalAid.schemeNames().map
 function fmtDate(d){ if(!d) return '—'; const dt=new Date(d+'T00:00:00'); return dt.toLocaleDateString('en-ZA',{day:'numeric',month:'short',year:'numeric'}); }
 function fmtTime(t){ if(!t) return '—'; const [h,m]=t.split(':'); const hr=parseInt(h); return `${hr>12?hr-12:hr===0?12:hr}:${m} ${hr>=12?'PM':'AM'}`; }
 function isoToday(){ return new Date().toISOString().slice(0,10); }
-function getWeekStart(offset=0){ const d=new Date(); d.setDate(d.getDate()-d.getDay()+1+offset*7); return d; }
+function getWeekStart(offset=0){ const d=new Date(); d.setDate(d.getDate()-((d.getDay()+6)%7)+offset*7); return d; }  // Monday (Sunday belongs to the week before)
 function addDays(d,n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
 function isoDate(d){ return d.toISOString().slice(0,10); }
 function capitalise(s){ return s?s.charAt(0).toUpperCase()+s.slice(1).replace(/_/g,' '):''; }
@@ -742,13 +754,15 @@ async function doLogin(){
 }
 
 async function verifyAndLaunch(user){
-  /* Check practice_members for this auth_id with an accepted role */
-  const {data:member,error}=await sb.from('practice_members')
-    .select('role,practice_id,practices(name)')
-    .eq('auth_id',user.id)
+  /* Staff sign in with a doctors row (doctors.auth_id) linked to a practice
+     through practice_members.doctor_id */
+  const {data:me}=await sb.from('doctors').select('id').eq('auth_id',user.id).order('created_at').limit(1).maybeSingle();
+  const {data:member,error}=me?await sb.from('practice_members')
+    .select('role,status,practice_id,practices(name)')
+    .eq('doctor_id',me.id)
     .in('role',['receptionist','admin','owner'])
-    .maybeSingle();
-  if(error||!member){
+    .limit(1).maybeSingle():{data:null,error:null};
+  if(error||!member||['suspended','removed','pending'].includes(member.status)){
     await sb.auth.signOut();
     showLogin('Access denied — this portal is for reception staff only.');
     return;
@@ -799,12 +813,10 @@ let REC_INVITE_TOKEN=null,REC_INVITE_DATA=null;
 async function checkReceptionInvite(){
   const token=new URLSearchParams(location.search).get('invite');
   if(!token) return false;
-  const {data}=await sb.from('practice_invites')
-    .select('id,email,role,practice_id,practices(name),status,expires_at')
-    .eq('token',token).in('role',['receptionist','nurse','admin'])
-    .eq('status','pending').gt('expires_at',new Date().toISOString()).maybeSingle();
-  if(!data){toast('This invite link is invalid or has expired. Contact your practice owner.','error');return false;}
-  REC_INVITE_TOKEN=token;REC_INVITE_DATA=data;return true;
+  const {data:rows}=await sb.rpc('get_practice_invite',{p_token:token});
+  const inv=rows?.[0];
+  if(!inv||!['receptionist','nurse','admin'].includes(inv.role)){toast('This invite link is invalid or has expired. Contact your practice owner.','error');return false;}
+  REC_INVITE_TOKEN=token;REC_INVITE_DATA={...inv,practices:{name:inv.practice_name}};return true;
 }
 
 function showInviteCard(){
@@ -836,19 +848,17 @@ async function acceptReceptionInvite(){
     options:{data:{fn,ln,name:`${fn} ${ln}`,role:REC_INVITE_DATA.role}}
   });
   if(error){errEl.style.display='block';errEl.textContent=error.message;btn.disabled=false;btn.textContent='Create Account & Join Practice →';return;}
-  const user=data.user;
-  await sb.from('practice_members').insert({
-    auth_id:user.id,practice_id:REC_INVITE_DATA.practice_id,
-    role:REC_INVITE_DATA.role,status:'active',email:REC_INVITE_DATA.email
-  });
-  await sb.from('practice_invites').update({status:'accepted'}).eq('token',REC_INVITE_TOKEN);
-  toast(`Welcome to ${REC_INVITE_DATA.practices?.name||'the practice'}!`,'success');
+  let user=data.user;
   if(!data.session){
-    const {data:sd}=await sb.auth.signInWithPassword({email:REC_INVITE_DATA.email,password:pw});
-    if(sd?.user) await verifyAndLaunch(sd.user);
-  } else {
-    await verifyAndLaunch(user);
+    const {data:sd,error:se}=await sb.auth.signInWithPassword({email:REC_INVITE_DATA.email,password:pw});
+    if(se||!sd?.user){errEl.style.display='block';errEl.textContent='Account created. Please confirm your email address, then open this invite link again to finish joining.';btn.disabled=false;btn.textContent='Create Account & Join Practice →';return;}
+    user=sd.user;
   }
+  // Joins the practice (creates the staff profile + membership) server-side
+  const {error:ae}=await sb.rpc('accept_practice_invite',{p_token:REC_INVITE_TOKEN,p_first_name:fn,p_last_name:ln});
+  if(ae){errEl.style.display='block';errEl.textContent=ae.message;btn.disabled=false;btn.textContent='Create Account & Join Practice →';return;}
+  toast(`Welcome to ${REC_INVITE_DATA.practices?.name||'the practice'}!`,'success');
+  await verifyAndLaunch(user);
 }
 
 /* ── BOOT ───────────────────────────────────────────────────── */
@@ -867,10 +877,10 @@ async function loadDashboard(){
   document.getElementById('dash-date').textContent=now.toLocaleDateString('en-ZA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   document.getElementById('dash-heading').textContent=`${greeting()}, ${(R.user?.user_metadata?.fn||'').split(' ')[0]||'Welcome'}`;
 
-  const {data:appts}=await sb.from('appointments')
-    .select('id,time,status,type,patients(first_name,last_name,medical_aid_provider,medical_aid_status,medical_aid_checked_at),doctors(first_name,last_name)')
-    .eq('date',today)
-    .order('time');
+  const {data:appts}=await withAidFallback(aid=>sb.from('appointments')
+    .select(`id,date:appt_date,time:appt_time,status,type,notes,patients(first_name,last_name,medical_aid_provider:aid_provider${aid?',medical_aid_status:aid_status,medical_aid_checked_at:aid_checked_at':''}),doctors(first_name,last_name)`)
+    .eq('appt_date',today)
+    .order('appt_time'));
 
   R.todayAppts=appts||[];
   renderDashStats(R.todayAppts);
@@ -912,17 +922,16 @@ function dashSearch(v){ renderDashAppts(R.todayAppts, v); }
 
 /* ── CACHE LOADERS ──────────────────────────────────────────── */
 async function loadDoctorsCache(){
-  const {data}=await sb.from('doctors')
-    .select('id,first_name,last_name,specialization,auth_id')
-    .order('first_name');
+  const {data:mem}=await sb.from('practice_members').select('doctor_id').eq('practice_id',R.practice.id).in('role',['owner','doctor']);
+  const ids=(mem||[]).map(m=>m.doctor_id);
+  const {data}=ids.length?await sb.from('doctors')
+    .select('id,first_name,last_name,specialization:spec,auth_id')
+    .in('id',ids).order('first_name'):{data:[]};
   R.doctors=data||[];
   populateDoctorSelect();
 }
 async function loadPatientsCache(){
-  const base='id,first_name,last_name,dob,id_number,phone,email,address,medical_aid_provider,medical_aid_number,medical_aid_plan,medical_aid_principal,medical_aid_status,medical_aid_checked_at,medical_aid_checked_by,medical_aid_check_method,doctor_id';
-  let {data,error}=await sb.from('patients').select(base+',medical_aid_dependant_code,medical_aid_check_ref,medical_aid_card_path').order('last_name');
-  // Columns from medical_aid_workflow.sql not added yet — load without them
-  if(error) ({data}=await sb.from('patients').select(base).order('last_name'));
+  const {data}=await withAidFallback(aid=>sb.from('patients').select(aid?PAT_BASE+','+PAT_AID:PAT_BASE).order('last_name'));
   allPatients=data||[];
 }
 
@@ -941,9 +950,9 @@ async function loadCalendar(){
   if(!calSelectedDay) calSelectedDay=isoDate(calDays.find(d=>isoDate(d)===isoToday())||calDays[0]);
 
   const {data:appts}=await sb.from('appointments')
-    .select('id,date,time,status,type,notes,patients(id,first_name,last_name),doctors(id,first_name,last_name)')
-    .gte('date',from).lte('date',to)
-    .order('time');
+    .select('id,date:appt_date,time:appt_time,status,type,notes,patients(id,first_name,last_name),doctors(id,first_name,last_name)')
+    .gte('appt_date',from).lte('appt_date',to)
+    .order('appt_time');
   weekAppts=appts||[];
   renderCalGrid();
 }
@@ -1053,7 +1062,7 @@ async function submitBooking(){
   const notes=document.getElementById('bk-notes').value.trim();
   const btn=document.getElementById('bk-submit-btn');
   btn.disabled=true; btn.textContent='Booking…';
-  const payload={ patient_id:patId, doctor_id:docId, date, time:slot, type, notes, status:'confirmed' };
+  const payload={ patient_id:patId, doctor_id:docId, practice_id:R.practice?.id, appt_date:date, appt_time:slot, type, notes, status:'confirmed', booked_by:'reception' };
   let error;
   if(editingApptId){
     ({error}=await sb.from('appointments').update(payload).eq('id',editingApptId));
@@ -1088,7 +1097,7 @@ function selectBookingPatient(id,name){
 const STATUSES=['confirmed','arrived','in_consultation','completed','no_show'];
 async function openApptDetail(id){
   const appt=weekAppts.find(a=>a.id===id)||R.todayAppts.find(a=>a.id===id);
-  if(!appt){ const {data}=await sb.from('appointments').select('*,patients(first_name,last_name),doctors(first_name,last_name)').eq('id',id).single(); if(data) renderApptDetail(data); return; }
+  if(!appt){ const {data}=await sb.from('appointments').select('*,date:appt_date,time:appt_time,patients(first_name,last_name),doctors(first_name,last_name)').eq('id',id).single(); if(data) renderApptDetail(data); return; }
   renderApptDetail(appt);
 }
 function renderApptDetail(a){
@@ -1308,13 +1317,12 @@ async function saveAidDetails(){
   if(fmt.status==='format_invalid'){ toast(fmt.message,'error'); return; }
   if(MedicalAid.validateSAId(idn).status==='invalid'){ toast(MedicalAid.validateSAId(idn).message,'error'); return; }
   if(MedicalAid.validateDependantCode(dep,principal).status==='invalid'){ toast('Dependant code is two digits, e.g. 00 or 01','error'); return; }
-  const patch={medical_aid_number:num,id_number:idn||null,medical_aid_principal:principal||null,medical_aid_dependant_code:dep||null};
-  if(num!==(p.medical_aid_number||'')||dep!==(p.medical_aid_dependant_code||'')) patch.medical_aid_status='unverified';
-  const {error}=await sb.from('patients').update(patch).eq('id',p.id);
+  const wasStatus=p.medical_aid_status;
+  const {data:res,error}=await sb.rpc('update_patient_medical_aid',{p_patient:p.id,p_changes:{aid_number:num,id_number:idn,principal,aid_dependant_code:dep}});
   if(error){ toast(error.message,'error'); return; }
-  Object.assign(p,patch);
+  applyAidResult(p,res);
   VA.editDetails=false; renderVerifyAidBody(); renderPatientTable(allPatients);
-  toast(patch.medical_aid_status?'Details saved — membership needs verifying again':'Details saved','success');
+  toast(p.medical_aid_status==='unverified'&&wasStatus!=='unverified'?'Details saved — membership needs verifying again':'Details saved','success');
 }
 
 async function uploadCardPhoto(file){
@@ -1326,9 +1334,9 @@ async function uploadCardPhoto(file){
   toast('Uploading card photo…','info');
   const {error}=await sb.storage.from(CARD_BUCKET).upload(path,file,{contentType:file.type,upsert:false});
   if(error){ toast(error.message,'error'); return; }
-  const {error:ue}=await sb.from('patients').update({medical_aid_card_path:path}).eq('id',p.id);
+  const {data:res,error:ue}=await sb.rpc('update_patient_medical_aid',{p_patient:p.id,p_changes:{aid_card_path:path}});
   if(ue){ toast(ue.message,'error'); return; }
-  p.medical_aid_card_path=path;
+  applyAidResult(p,res);
   await loadCardUrl(p);
   VA.method='card';
   renderVerifyAidBody();
@@ -1374,16 +1382,11 @@ async function setAidStatus(status){
   toast(status==='verified'?'Medical aid marked as verified':'Medical aid marked as invalid',status==='verified'?'success':'info');
 }
 
+// Saves the result and a history row server-side (reception can't edit patients directly)
 async function persistAidStatus(p,status,method,ref,message){
-  const meta=R.user?.user_metadata||{};
-  const by=meta.fn?`${meta.fn} ${meta.ln||''}`.trim():(R.user?.email||'reception');
-  const now=new Date().toISOString();
-  const patch={medical_aid_status:status,medical_aid_checked_at:now,medical_aid_checked_by:by,medical_aid_check_method:method,medical_aid_check_ref:ref||null};
-  const {error}=await sb.from('patients').update(patch).eq('id',p.id);
+  const {data:res,error}=await sb.rpc('record_medical_aid_check',{p_patient:p.id,p_status:status,p_method:method,p_reference:ref||null,p_message:message||null});
   if(error){ toast(error.message,'error'); return false; }
-  Object.assign(p,patch);
-  const {error:he}=await sb.from('medical_aid_checks').insert({patient_id:p.id,status,method,reference:ref||null,message:message||null,checked_by:by});
-  if(he) console.warn('check history not saved',he.message);
+  applyAidResult(p,res);
   return true;
 }
 
@@ -1429,7 +1432,7 @@ function filterPatients(val){
 function openNewPatient(){
   // Populate doctor dropdown from loaded data
   const sel=document.getElementById('np-doctor');
-  sel.innerHTML='<option value="">Unassigned — assign later</option>';
+  sel.innerHTML='<option value="">Select a doctor…</option>';
   (R.doctors||[]).forEach(d=>{ const o=document.createElement('option'); o.value=d.id; o.textContent=`Dr ${esc(d.first_name+' '+d.last_name)}`; sel.appendChild(o); });
   // Clear fields and errors
   ['np-fname','np-lname','np-dob','np-idnum','np-phone','np-email','np-address','np-ma-provider','np-ma-number','np-ma-plan','np-ma-dep','np-ma-principal'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
@@ -1454,6 +1457,7 @@ async function saveNewPatient(){
   const maDep=document.getElementById('np-ma-dep').value.trim();
   if(!valid) return;
   const doctorId=document.getElementById('np-doctor').value||null;
+  if(!doctorId){ toast('Choose the doctor this patient will see','error'); return; }
   const payload={
     first_name: fname, last_name: lname,
     dob: document.getElementById('np-dob').value||null,
@@ -1461,15 +1465,16 @@ async function saveNewPatient(){
     phone, email: document.getElementById('np-email').value.trim()||null,
     address: document.getElementById('np-address').value.trim()||null,
     doctor_id: doctorId,
-    medical_aid_provider: maProvider||null,
-    medical_aid_number: maNumber||null,
-    medical_aid_plan: document.getElementById('np-ma-plan').value.trim()||null,
-    medical_aid_principal: document.getElementById('np-ma-principal').value.trim()||null,
-    medical_aid_status: maProvider?'unverified':null,
+    aid_provider: maProvider||null,
+    aid_number: maNumber||null,
+    aid_plan: document.getElementById('np-ma-plan').value.trim()||null,
+    principal: document.getElementById('np-ma-principal').value.trim()||null,
   };
-  if(maDep) payload.medical_aid_dependant_code=maDep;
+  // Workflow columns (medical_aid_workflow.sql)
+  if(maProvider) payload.aid_status='unverified';
+  if(maDep) payload.aid_dependant_code=maDep;
   setBtn('np-submit-btn','Saving…',true);
-  const {data, error}=await sb.from('patients').insert(payload).select('*').single();
+  const {data, error}=await sb.from('patients').insert(payload).select(PAT_BASE+(payload.aid_status||payload.aid_dependant_code?','+PAT_AID:'')).single();
   setBtn('np-submit-btn','Register Patient',false);
   if(error){ toast(error.message,'error'); return; }
   allPatients.unshift(data);
@@ -1483,8 +1488,8 @@ async function loadDoctors(){
   document.getElementById('doc-list').style.display='block';
   document.getElementById('doc-detail').style.display='none';
   const today=isoToday();
-  const {data:appts}=await sb.from('appointments').select('doctor_id,status').eq('date',today);
-  const {data:avail}=await sb.from('doctor_availability').select('doctor_id,day_of_week,start_time,end_time,is_available');
+  const {data:appts}=await sb.from('appointments').select('doctor_id,status').eq('appt_date',today);
+  const {data:avail}=await sb.from('availability').select('doctor_id,day_of_week,start_time,end_time,is_available:is_active');
   renderDoctorList(R.doctors, appts||[], avail||[]);
 }
 
@@ -1516,7 +1521,7 @@ async function viewDoctor(id){
   const doc=R.doctors.find(d=>d.id===id); if(!doc) return;
   document.getElementById('doc-list').style.display='none';
   document.getElementById('doc-detail').style.display='block';
-  const {data:avail}=await sb.from('doctor_availability').select('*').eq('doctor_id',id);
+  const {data:avail}=await sb.from('availability').select('*,is_available:is_active').eq('doctor_id',id);
   const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const schedHtml=`<div class="avail-week">${days.map((day,i)=>{
     const dow=i+1;
