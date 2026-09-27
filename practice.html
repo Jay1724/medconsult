@@ -754,6 +754,12 @@ async function checkSessionAndRoute(user,session){
     showScreen('denied-screen');
     return;
   }
+  if(member.practices?.plan==='solo'){
+    /* Solo Professional doctor with the receptionist add-on — managed from the Doctor Platform */
+    document.getElementById('denied-msg').textContent='Your account is on the Professional plan. Manage your receptionists under Subscription in the Doctor Platform (doctor.html).';
+    showScreen('denied-screen');
+    return;
+  }
   ST.user=user;ST.member=member;ST.practice=member.practices;
   setupDashboard();
 }
