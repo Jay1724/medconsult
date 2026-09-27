@@ -1441,12 +1441,10 @@ let INVITE_TOKEN = null, INVITE_DATA = null;
 async function checkPracticeInvite() {
   const token = new URLSearchParams(location.search).get('invite');
   if (!token) return false;
-  const { data } = await sbClient.from('practice_invites')
-    .select('id,email,role,practice_id,practices(name),status,expires_at')
-    .eq('token', token).eq('status','pending')
-    .gt('expires_at', new Date().toISOString()).maybeSingle();
-  if (!data) { toast('This invite link is invalid or has expired. Contact your practice owner.','error'); return false; }
-  INVITE_TOKEN = token; INVITE_DATA = data;
+  const { data: rows } = await sbClient.rpc('get_practice_invite', { p_token: token });
+  const inv = rows?.[0];
+  if (!inv) { toast('This invite link is invalid or has expired. Contact your practice owner.','error'); return false; }
+  INVITE_TOKEN = token; INVITE_DATA = { ...inv, practices: { name: inv.practice_name } };
   return true;
 }
 
@@ -1485,29 +1483,19 @@ async function acceptDoctorInvite() {
     options:{ data:{ fn, ln, spec, hpcsa, name:`Dr. ${fn} ${ln}`, plan:'practice' } }
   });
   if (error) { toast(error.message,'error'); if(btn){btn.disabled=false;btn.textContent='Accept Invitation →';} return; }
-  const user = data.user;
-  // Insert doctor record
-  const { data: doc } = await sbClient.from('doctors').insert({
-    auth_id: user.id, first_name: fn, last_name: ln, specialization: spec,
-    hpcsa_number: hpcsa, practice_id: INVITE_DATA.practice_id
-  }).select().single();
-  // Add to practice_members
-  await sbClient.from('practice_members').insert({
-    auth_id: user.id, practice_id: INVITE_DATA.practice_id,
-    role: INVITE_DATA.role, status: 'active', email: INVITE_DATA.email
-  });
-  // Mark invite accepted
-  await sbClient.from('practice_invites').update({ status:'accepted' }).eq('token', INVITE_TOKEN);
-  // Seed availability
+  let user = data.user;
+  if (!data.session) {
+    const { data: sd, error: se } = await sbClient.auth.signInWithPassword({ email: INVITE_DATA.email, password: pw });
+    if (se || !sd?.user) { toast('Account created — confirm your email, then open the invite link again to finish joining.','info'); if(btn){btn.disabled=false;btn.textContent='Accept Invitation →';} return; }
+    user = sd.user;
+  }
+  // Creates the doctor profile + practice membership server-side
+  const { error: ae } = await sbClient.rpc('accept_practice_invite', { p_token: INVITE_TOKEN, p_first_name: fn, p_last_name: ln, p_spec: spec, p_hpcsa: hpcsa || null });
+  if (ae) { toast(ae.message,'error'); if(btn){btn.disabled=false;btn.textContent='Accept Invitation →';} return; }
+  const { data: doc } = await sbClient.from('doctors').select('id').eq('auth_id', user.id).order('created_at').limit(1).maybeSingle();
   if (doc?.id) await sbClient.rpc('seed_default_availability',{p_doctor_id:doc.id}).catch(()=>{});
   toast(`Welcome to ${INVITE_DATA.practices?.name||'the practice'}!`,'success');
-  // Sign in properly if session not active yet
-  if (!data.session) {
-    const { data: sd } = await sbClient.auth.signInWithPassword({ email: INVITE_DATA.email, password: pw });
-    if (sd?.user) { S.doc = docFromMeta(sd.user.user_metadata, sd.user.email); S.plan = 'practice'; launchApp(); }
-  } else {
-    S.doc = docFromMeta(data.user.user_metadata, data.user.email); S.plan = 'practice'; launchApp();
-  }
+  S.doc = docFromMeta(user.user_metadata, user.email); S.plan = 'practice'; launchApp();
 }
 
 // Restore session on page load
@@ -1954,14 +1942,15 @@ function renderReceptionCard(){
 async function getDoctorRow(){
   const {data:{user}}=await sbClient.auth.getUser();
   if(!user) return null;
-  const {data,error}=await sbClient.from('doctors').select('id,practice_id').eq('auth_id',user.id).maybeSingle();
+  const {data,error}=await sbClient.from('doctors').select('id').eq('auth_id',user.id).order('created_at').limit(1).maybeSingle();
   if(error) throw error;
   if(data) return data;
   const d=S.doc;
   const {data:created,error:ce}=await sbClient.from('doctors').insert({
-    auth_id:user.id,first_name:d.fn,last_name:d.ln,specialization:d.spec,
-    hpcsa_number:d.hpcsa||null,signature_name:d.sig||d.name
-  }).select('id,practice_id').single();
+    auth_id:user.id,first_name:d.fn,last_name:d.ln,name:d.name,email:d.email,spec:d.spec,
+    hpcsa:d.hpcsa||null,prac_num:d.pracnum||null,prac_name:d.pracName||null,prac_addr:d.pracAddr||null,
+    phone:d.phone||null,vat:d.vat||null,bank:d.bank||null,signature:d.sig||d.name,plan:S.plan
+  }).select('id').single();
   if(ce) throw ce;
   return created;
 }
@@ -1971,12 +1960,13 @@ async function loadReception(){
   RX.loaded=false;RX.members=[];RX.invites=[];
   try{
     const {data:{user}}=await sbClient.auth.getUser();
-    const {data:own}=await sbClient.from('practice_members').select('practice_id,practices(plan)')
-      .eq('auth_id',user.id).eq('role','owner').maybeSingle();
+    const {data:me}=await sbClient.from('doctors').select('id').eq('auth_id',user.id).order('created_at').limit(1).maybeSingle();
+    const {data:own}=me?await sbClient.from('practice_members').select('practice_id,practices(plan)')
+      .eq('doctor_id',me.id).eq('role','owner').limit(1).maybeSingle():{data:null};
     RX.practiceId=own?.practices?.plan==='solo'?own.practice_id:null;
     if(RX.practiceId){
       const [{data:m},{data:i}]=await Promise.all([
-        sbClient.from('practice_members').select('id,email,status,created_at').eq('practice_id',RX.practiceId).eq('role','receptionist').order('created_at'),
+        sbClient.from('practice_members').select('id,email:invite_email,status,created_at').eq('practice_id',RX.practiceId).eq('role','receptionist').order('created_at'),
         sbClient.from('practice_invites').select('id,email,token,expires_at').eq('practice_id',RX.practiceId).eq('role','receptionist').eq('status','pending').gt('expires_at',new Date().toISOString()).order('created_at')
       ]);
       RX.members=m||[];RX.invites=i||[];
@@ -1988,24 +1978,12 @@ async function loadReception(){
 
 async function ensureSoloPractice(){
   if(RX.practiceId) return RX.practiceId;
-  const doc=await getDoctorRow();
-  if(!doc) throw new Error('Please sign in again');
-  if(doc.practice_id) throw new Error('Your account already belongs to a practice. Ask the practice owner to invite reception staff.');
-  const {data:{user}}=await sbClient.auth.getUser();
-  const d=S.doc;
-  const {data:pr,error:pe}=await sbClient.from('practices').insert({
-    name:d.pracName||`${d.name} Practice`,address:d.pracAddr||null,phone:d.phone||null,
-    email:d.email,hpcsa_number:d.pracnum||null,vat_number:d.vat||null,plan:'solo'
-  }).select('id').single();
-  if(pe) throw pe;
-  const {error:de}=await sbClient.from('doctors').update({practice_id:pr.id}).eq('id',doc.id);
-  if(de) throw de;
-  const {error:me}=await sbClient.from('practice_members').insert({
-    auth_id:user.id,practice_id:pr.id,role:'owner',status:'active',email:d.email
-  });
-  if(me) throw me;
-  RX.practiceId=pr.id;
-  return pr.id;
+  await getDoctorRow();  // make sure the doctor profile exists
+  // Creates (or returns) the private one-doctor practice server-side
+  const {data,error}=await sbClient.rpc('create_solo_practice');
+  if(error) throw error;
+  RX.practiceId=data;
+  return data;
 }
 
 function receptionLink(token){return new URL('reception.html?invite='+token,location.href).href}
@@ -2031,8 +2009,9 @@ async function inviteReceptionist(){
   try{
     const pid=await ensureSoloPractice();
     const token=crypto.randomUUID();
+    const me=await getDoctorRow();
     const {error}=await sbClient.from('practice_invites').insert({
-      practice_id:pid,email,role:'receptionist',token,status:'pending',
+      practice_id:pid,invited_by:me?.id||null,email,role:'receptionist',token,status:'pending',
       expires_at:new Date(Date.now()+7*86400000).toISOString()
     });
     if(error) throw error;

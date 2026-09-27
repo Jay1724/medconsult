@@ -736,11 +736,13 @@ async function doLogout(){
 
 async function checkSessionAndRoute(user,session){
   showEl('loading-screen');
-  const {data:member}=await sb.from('practice_members')
-    .select('role,practice_id,practices(id,name,address,phone,email,hpcsa_number,vat_number,bank_account,plan,trial_ends_at,created_at)')
-    .eq('auth_id',user.id)
+  /* Staff are doctors rows (doctors.auth_id) linked via practice_members.doctor_id */
+  const {data:me}=await sb.from('doctors').select('id').eq('auth_id',user.id).order('created_at').limit(1).maybeSingle();
+  const {data:member}=me?await sb.from('practice_members')
+    .select('role,practice_id,practices(id,name,address,phone,email,hpcsa_number,vat_number,bank_account:bank_details,plan,trial_ends_at,created_at)')
+    .eq('doctor_id',me.id)
     .in('role',['owner','admin'])
-    .maybeSingle();
+    .limit(1).maybeSingle():{data:null};
 
   if(!member){
     /* New owner — check for pending setup data */
@@ -767,41 +769,33 @@ async function checkSessionAndRoute(user,session){
 /* ── COMPLETE PENDING SETUP ─────────────────────────────────── */
 async function completePendingSetup(user,reg){
   try{
-    /* 1. Insert practice */
-    const trialEnd=new Date(Date.now()+30*86400000).toISOString();
-    const {data:practice,error:pe}=await sb.from('practices').insert({
+    /* 1–3. Practice, owner profile and owner membership — created server-side
+       (create_practice) because RLS only lets members read a practice */
+    const {data:practiceId,error:pe}=await sb.rpc('create_practice',{p:{
       name:reg.practiceName,address:reg.practiceAddr,phone:reg.practicePhone,
-      email:reg.practiceEmail,hpcsa_number:reg.practiceHpcsa,vat_number:reg.practiceVat||null,
-      plan:'practice',trial_ends_at:trialEnd
-    }).select().single();
+      email:reg.practiceEmail,hpcsa_number:reg.practiceHpcsa,vat_number:reg.practiceVat||'',
+      owner_first_name:reg.ownerFn,owner_last_name:reg.ownerLn,owner_spec:reg.ownerSpec,
+      owner_hpcsa:reg.ownerHpcsa,owner_signature:reg.ownerSig
+    }});
     if(pe) throw pe;
+    const {data:practice,error:ge}=await sb.from('practices')
+      .select('id,name,address,phone,email,hpcsa_number,vat_number,bank_account:bank_details,plan,trial_ends_at,created_at')
+      .eq('id',practiceId).single();
+    if(ge) throw ge;
+    const {data:me}=await sb.from('doctors').select('id').eq('auth_id',user.id).order('created_at').limit(1).single();
 
-    /* 2. Insert doctor */
-    const {data:doctor,error:de}=await sb.from('doctors').insert({
-      auth_id:user.id,first_name:reg.ownerFn,last_name:reg.ownerLn,
-      specialization:reg.ownerSpec,hpcsa_number:reg.ownerHpcsa,
-      signature_name:reg.ownerSig,practice_id:practice.id
-    }).select().single();
-    if(de) throw de;
-
-    /* 3. Insert owner as practice member */
-    await sb.from('practice_members').insert({
-      auth_id:user.id,practice_id:practice.id,role:'owner',
-      status:'active',email:reg.ownerEmail
-    });
-
-    /* 4. Insert team invites */
+    /* 4. Team invites */
     for(const m of (reg.team||[])){
       const token=crypto.randomUUID();
       await sb.from('practice_invites').insert({
-        practice_id:practice.id,email:m.email,role:m.role,
+        practice_id:practice.id,invited_by:me?.id||null,email:m.email,role:m.role,
         token,status:'pending',
         expires_at:new Date(Date.now()+7*86400000).toISOString()
       });
     }
 
     /* 5. Seed availability */
-    await sb.rpc('seed_default_availability',{p_doctor_id:doctor.id}).catch(()=>{});
+    if(me?.id) await sb.rpc('seed_default_availability',{p_doctor_id:me.id}).catch(()=>{});
 
     localStorage.removeItem(PENDING_KEY);
     ST.user=user;ST.practice=practice;
@@ -862,10 +856,12 @@ async function loadOverview(){
   const now=new Date();
   const firstOfMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
 
+  const {data:mem}=await sb.from('practice_members').select('doctor_id').eq('practice_id',pid).in('role',['owner','doctor']);
+  const memIds=(mem||[]).map(m=>m.doctor_id);
   const [{data:docs},{data:appts},{data:monthAppts}]=await Promise.all([
-    sb.from('doctors').select('id,first_name,last_name,specialization').eq('practice_id',pid),
-    sb.from('appointments').select('doctor_id,status').eq('date',today),
-    sb.from('appointments').select('id,doctor_id').gte('date',firstOfMonth).lte('date',today)
+    memIds.length?sb.from('doctors').select('id,first_name,last_name,specialization:spec').in('id',memIds):Promise.resolve({data:[]}),
+    sb.from('appointments').select('doctor_id,status').eq('appt_date',today),
+    sb.from('appointments').select('id,doctor_id').gte('appt_date',firstOfMonth).lte('appt_date',today)
   ]);
 
   const docIds=(docs||[]).map(d=>d.id);
@@ -909,7 +905,7 @@ async function loadOverview(){
 async function loadTeam(){
   const pid=ST.practice?.id;
   const [{data:members},{data:invites}]=await Promise.all([
-    sb.from('practice_members').select('id,auth_id,email,role,status,created_at').eq('practice_id',pid).order('created_at'),
+    sb.from('practice_members').select('id,doctor_id,email:invite_email,role,status,created_at').eq('practice_id',pid).order('created_at'),
     sb.from('practice_invites').select('id,email,role,token,status,created_at,expires_at').eq('practice_id',pid).eq('status','pending').order('created_at',{ascending:false})
   ]);
 
@@ -1014,8 +1010,9 @@ async function sendInvite(){
   const btn=document.getElementById('inv-submit-btn');
   btn.disabled=true;btn.textContent='Sending…';
   const token=crypto.randomUUID();
+  const {data:me}=await sb.from('doctors').select('id').eq('auth_id',ST.user.id).order('created_at').limit(1).maybeSingle();
   const {error}=await sb.from('practice_invites').insert({
-    practice_id:ST.practice?.id,email,role,token,status:'pending',
+    practice_id:ST.practice?.id,invited_by:me?.id||null,email,role,token,status:'pending',
     expires_at:new Date(Date.now()+7*86400000).toISOString()
   });
   btn.disabled=false;btn.textContent='Send Invite';
@@ -1035,7 +1032,7 @@ function practiceMonthlyPrice(doctors){
 }
 async function loadBilling(){
   const p=ST.practice;
-  const {count:docCount}=await sb.from('doctors').select('id',{count:'exact',head:true}).eq('practice_id',p?.id);
+  const {count:docCount}=await sb.from('practice_members').select('id',{count:'exact',head:true}).eq('practice_id',p?.id).in('role',['owner','doctor']);
   const monthly=practiceMonthlyPrice(docCount||0);
   const trialEnd=p?.trial_ends_at;
   const days=trialEnd?daysUntil(trialEnd):0;
@@ -1126,14 +1123,14 @@ async function saveSettings(){
     email:document.getElementById('set-email').value.trim(),
     hpcsa_number:document.getElementById('set-hpcsa').value.trim(),
     vat_number:document.getElementById('set-vat').value.trim()||null,
-    bank_account:document.getElementById('set-bank').value.trim()||null
+    bank_details:document.getElementById('set-bank').value.trim()||null
   };
   const btn=document.getElementById('save-settings-btn');
   btn.disabled=true;btn.textContent='Saving…';
   const {error}=await sb.from('practices').update(updates).eq('id',ST.practice?.id);
   btn.disabled=false;btn.textContent='Save Changes';
   if(error){document.getElementById('settings-err').textContent=error.message;return;}
-  Object.assign(ST.practice,updates);
+  Object.assign(ST.practice,updates,{bank_account:updates.bank_details});
   document.getElementById('sb-practice-name').textContent=updates.name;
   toast('Practice settings saved','success');
 }
