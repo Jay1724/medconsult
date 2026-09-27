@@ -25,10 +25,17 @@ ALTER TABLE patients
   ADD COLUMN IF NOT EXISTS medical_aid_checked_by text,
   ADD COLUMN IF NOT EXISTS medical_aid_check_method text;
 
-UPDATE patients
-SET medical_aid_status = 'unverified'
-WHERE medical_aid_provider IS NOT NULL
-  AND medical_aid_status IS NULL;
+-- Backfill 'unverified' for patients on medical aid — only if the table has a
+-- medical_aid_provider column (older schemas name it differently).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'patients'
+               AND column_name = 'medical_aid_provider') THEN
+    EXECUTE 'UPDATE public.patients SET medical_aid_status = ''unverified''
+             WHERE medical_aid_provider IS NOT NULL AND medical_aid_status IS NULL';
+  END IF;
+END $$;
 
 -- New in this script.
 ALTER TABLE patients
