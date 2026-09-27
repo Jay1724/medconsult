@@ -3,16 +3,16 @@
 -- Run in the Supabase SQL editor. Safe to run more than once.
 --
 -- Adds to patients (alongside aid_provider / aid_number / aid_plan / principal):
---   aid_status          'unverified' | 'verified' | 'invalid'  (NULL = self-pay)
+--   aid_status          unverified | verified | invalid  (NULL = self-pay)
 --   aid_checked_at      when it was last checked
 --   aid_checked_by      who checked (staff name)
---   aid_check_method    'phone' | 'portal' | 'card' | 'api' | 'manual'
+--   aid_check_method    phone | portal | card | api | manual
 --   aid_check_ref       call / portal reference
 --   aid_dependant_code  two digits, 00 = main member
 --   aid_card_path       membership card photo in storage
 -- Plus:
 --   medical_aid_checks        history of every check
---   practice_scheme_contacts  each practice's saved scheme phone / portal links
+--   practice_scheme_contacts  saved per practice: scheme phone / portal links
 --   storage bucket medical-aid-cards  (private, files under <practice_id>/…)
 --   record_medical_aid_check() / update_patient_medical_aid()
 --     — reception can only read patients under RLS, so these functions make
@@ -39,7 +39,7 @@ ALTER TABLE patients DROP CONSTRAINT IF EXISTS patients_aid_dependant_code_check
 ALTER TABLE patients ADD CONSTRAINT patients_aid_dependant_code_check
   CHECK (aid_dependant_code ~ '^\d{2}$');
 
--- Patients already on medical aid start as 'unverified'.
+-- Patients already on medical aid start as unverified.
 UPDATE patients SET aid_status = 'unverified'
 WHERE nullif(trim(aid_provider), '') IS NOT NULL AND aid_status IS NULL;
 
@@ -95,8 +95,7 @@ CREATE POLICY medical_aid_cards_rw ON storage.objects FOR ALL TO authenticated
 
 -- ── Functions ───────────────────────────────────────────────────────────────
 -- Name recorded as "checked by" for the signed-in user.
-CREATE OR REPLACE FUNCTION public.my_display_name() RETURNS text
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION public.my_display_name() RETURNS text LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT coalesce(
     (SELECT coalesce(nullif(trim(coalesce(first_name,'') || ' ' || coalesce(last_name,'')), ''), name, email)
        FROM doctors WHERE auth_id = auth.uid() ORDER BY created_at LIMIT 1),
@@ -104,11 +103,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 $$;
 
 -- Record a verification result and add it to the history.
-CREATE OR REPLACE FUNCTION public.record_medical_aid_check(
-  p_patient uuid, p_status text, p_method text,
-  p_reference text DEFAULT NULL, p_message text DEFAULT NULL)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION public.record_medical_aid_check( p_patient uuid, p_status text, p_method text, p_reference text DEFAULT NULL, p_message text DEFAULT NULL) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   who text := public.my_display_name();
   row_out patients%ROWTYPE;
@@ -133,9 +128,7 @@ END $$;
 -- Correct medical aid details. Only these keys are accepted:
 --   aid_number, aid_dependant_code, id_number, principal, aid_card_path
 -- Changing the member number or dependant code resets the status to unverified.
-CREATE OR REPLACE FUNCTION public.update_patient_medical_aid(p_patient uuid, p_changes jsonb)
-RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION public.update_patient_medical_aid(p_patient uuid, p_changes jsonb) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   cur patients%ROWTYPE;
   bad text;

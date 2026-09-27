@@ -15,21 +15,19 @@
 --   2. replaces the recursive policies with equivalents that use the helpers
 --   3. adds the missing policies: reception reads practice doctors, registers
 --      patients; owners manage invites
---   4. adds functions for steps the browser can't do under RLS: reading an
+--   4. adds functions for steps the browser cannot do under RLS: reading an
 --      invite by token, accepting it, and creating a practice
---   5. allows practices.plan = 'solo' (Professional doctor + receptionist add-on)
+--   5. allows practices.plan = solo (Professional doctor + receptionist add-on)
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ── 1. Helpers ──────────────────────────────────────────────────────────────
--- Signed-in user's doctors row (receptionists have one too).
-CREATE OR REPLACE FUNCTION public.my_doctor_id() RETURNS uuid
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+-- Doctors row of the signed-in user (receptionists have one too).
+CREATE OR REPLACE FUNCTION public.my_doctor_id() RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT id FROM doctors WHERE auth_id = auth.uid() ORDER BY created_at LIMIT 1
 $$;
 
 -- Practices the signed-in user is an active member of (optionally with a role).
-CREATE OR REPLACE FUNCTION public.my_practice_ids(p_roles text[] DEFAULT NULL) RETURNS SETOF uuid
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION public.my_practice_ids(p_roles text[] DEFAULT NULL) RETURNS SETOF uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT pm.practice_id
   FROM practice_members pm JOIN doctors d ON d.id = pm.doctor_id
   WHERE d.auth_id = auth.uid()
@@ -38,17 +36,15 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
 $$;
 
 -- doctors.id of everyone in those practices (optionally only some roles).
-CREATE OR REPLACE FUNCTION public.my_practice_member_doctor_ids(p_my_roles text[] DEFAULT NULL, p_their_roles text[] DEFAULT NULL) RETURNS SETOF uuid
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION public.my_practice_member_doctor_ids(p_my_roles text[] DEFAULT NULL, p_their_roles text[] DEFAULT NULL) RETURNS SETOF uuid LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT pm.doctor_id FROM practice_members pm
   WHERE pm.practice_id IN (SELECT public.my_practice_ids(p_my_roles))
     AND (p_their_roles IS NULL OR pm.role = ANY (p_their_roles))
 $$;
 
 -- Can the signed-in user work with this patient? (their own doctor, or front
--- desk / owner in the practice of the patient's doctor)
-CREATE OR REPLACE FUNCTION public.can_access_patient(p_patient uuid) RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+-- desk / owner in the practice of the doctor of the patient)
+CREATE OR REPLACE FUNCTION public.can_access_patient(p_patient uuid) RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT EXISTS (
     SELECT 1 FROM patients p
     WHERE p.id = p_patient
@@ -99,7 +95,7 @@ DROP POLICY IF EXISTS "Reception registers practice patients" ON patients;
 CREATE POLICY "Reception registers practice patients" ON patients FOR INSERT TO authenticated
   WITH CHECK (doctor_id IN (SELECT public.my_practice_member_doctor_ids(ARRAY['receptionist','owner','admin'], ARRAY['owner','doctor'])));
 
--- Invites: owners / admins manage their practice's invites. Reading one by
+-- Invites: owners / admins manage the invites of their practice. Reading one by
 -- token (before sign-up) goes through get_practice_invite() below.
 ALTER TABLE practice_invites ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Owner manages practice invites" ON practice_invites;
@@ -107,11 +103,9 @@ CREATE POLICY "Owner manages practice invites" ON practice_invites FOR ALL TO au
   USING (practice_id IN (SELECT public.my_practice_ids(ARRAY['owner','admin'])))
   WITH CHECK (practice_id IN (SELECT public.my_practice_ids(ARRAY['owner','admin'])));
 
--- ── 4. Functions for steps RLS can't allow from the browser ─────────────────
+-- ── 4. Functions for steps RLS cannot allow from the browser ─────────────────
 -- Invite details for the sign-up screen (only pending, unexpired invites).
-CREATE OR REPLACE FUNCTION public.get_practice_invite(p_token text)
-RETURNS TABLE (email text, role text, practice_id uuid, practice_name text, expires_at timestamptz)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION public.get_practice_invite(p_token text) RETURNS TABLE (email text, role text, practice_id uuid, practice_name text, expires_at timestamptz) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT i.email, i.role, i.practice_id, pr.name, i.expires_at
   FROM practice_invites i JOIN practices pr ON pr.id = i.practice_id
   WHERE i.token = p_token AND i.status = 'pending' AND i.expires_at > now()
@@ -120,9 +114,7 @@ GRANT EXECUTE ON FUNCTION public.get_practice_invite(text) TO anon, authenticate
 
 -- Accept an invite as the signed-in user: creates their doctors row if needed,
 -- adds them to the practice, marks the invite accepted. Returns practice id.
-CREATE OR REPLACE FUNCTION public.accept_practice_invite(p_token text, p_first_name text, p_last_name text, p_spec text DEFAULT NULL, p_hpcsa text DEFAULT NULL)
-RETURNS uuid
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION public.accept_practice_invite(p_token text, p_first_name text, p_last_name text, p_spec text DEFAULT NULL, p_hpcsa text DEFAULT NULL) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   inv practice_invites%ROWTYPE;
   my_email text;
@@ -161,8 +153,7 @@ GRANT EXECUTE ON FUNCTION public.accept_practice_invite(text, text, text, text, 
 -- Register a multi-doctor practice with the signed-in user as owner.
 -- p jsonb keys: name, address, phone, email, hpcsa_number, vat_number,
 --               owner_first_name, owner_last_name, owner_spec, owner_hpcsa, owner_signature
-CREATE OR REPLACE FUNCTION public.create_practice(p jsonb) RETURNS uuid
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION public.create_practice(p jsonb) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   doc_id uuid;
   pr_id uuid;
@@ -191,10 +182,9 @@ BEGIN
 END $$;
 GRANT EXECUTE ON FUNCTION public.create_practice(jsonb) TO authenticated;
 
--- Professional doctor's private one-doctor practice for the receptionist
+-- Private one-doctor practice for the receptionist
 -- add-on. Returns the existing one if already created.
-CREATE OR REPLACE FUNCTION public.create_solo_practice() RETURNS uuid
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+CREATE OR REPLACE FUNCTION public.create_solo_practice() RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   d doctors%ROWTYPE;
   pr_id uuid;
@@ -217,7 +207,7 @@ BEGIN
 END $$;
 GRANT EXECUTE ON FUNCTION public.create_solo_practice() TO authenticated;
 
--- ── 5. Allow plan = 'solo' ──────────────────────────────────────────────────
+-- ── 5. Allow plan = solo ──────────────────────────────────────────────────
 DO $$
 DECLARE c record;
 BEGIN
@@ -238,6 +228,6 @@ ALTER TABLE practices
 -- Billing: receptionist seats for each solo practice
 --   SELECT p.id, p.name, count(m.*) AS receptionists, 599 + 149 * count(m.*) AS monthly_zar
 --   FROM practices p
---   LEFT JOIN practice_members m ON m.practice_id = p.id AND m.role = 'receptionist'
---   WHERE p.plan = 'solo'
+--   LEFT JOIN practice_members m ON m.practice_id = p.id AND m.role = receptionist
+--   WHERE p.plan = solo
 --   GROUP BY p.id, p.name;
