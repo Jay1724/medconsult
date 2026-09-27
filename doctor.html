@@ -988,7 +988,7 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
         <div class="fg"><label>First Name *</label><input id="p-fn" placeholder="Sarah"></div>
         <div class="fg"><label>Last Name *</label><input id="p-ln" placeholder="Johnson"></div>
         <div class="fg"><label>Date of Birth</label><input type="date" id="p-dob"></div>
-        <div class="fg"><label>SA ID Number</label><input id="p-id" placeholder="9001015009087"></div>
+        <div class="fg"><label>SA ID Number</label><input id="p-id" placeholder="9001015009087" oninput="validatePId(true)"><span id="p-id-hint" style="display:block;font-size:11px;margin-top:4px;line-height:1.4"></span></div>
         <div class="fg"><label>Gender</label><select id="p-gen"><option>Female</option><option>Male</option><option>Non-binary</option><option>Prefer not to say</option></select></div>
         <div class="fg"><label>Blood Type</label><select id="p-bl"><option value="">Unknown</option><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></div>
         <div class="fg"><label>Phone</label><input type="tel" id="p-ph" placeholder="+27 71 234 5678"></div>
@@ -1595,8 +1595,8 @@ function renderPats(filter=''){
 }
 function filterPats(v){renderPats(v)}
 function globalSearch(v){if(v.length>1){renderPats(v);nav('patients',document.querySelector('[onclick*=patients]'));}}
-function showAddPatient(){editPID=null;document.getElementById('m-patient-title').textContent='Add New Patient';['fn','ln','id','ph','wa','em','aidnum','aidplan','principal','allerg','chronic','emer'].forEach(f=>{const el=document.getElementById('p-'+f);if(el)el.value=''});document.getElementById('p-dob').value='';document.getElementById('p-addr').value='';document.getElementById('p-aid').value='';document.getElementById('p-gen').value='Female';document.getElementById('p-bl').value='';openM('m-patient');}
-function editPat(id){const p=gp(id);editPID=id;document.getElementById('m-patient-title').textContent='Edit Patient';['fn','ln','dob','idnum','gen','bl','ph','wa','em'].forEach(k=>{const el=document.getElementById('p-'+k.replace('idnum','id').replace('gen','gen').replace('bl','bl'));if(el)el.value=p[k]||p[k.replace('fn','fn').replace('ln','ln')]||''});document.getElementById('p-fn').value=p.fn;document.getElementById('p-ln').value=p.ln;document.getElementById('p-dob').value=p.dob||'';document.getElementById('p-id').value=p.idnum||'';document.getElementById('p-gen').value=p.gen||'Female';document.getElementById('p-bl').value=p.bl||'';document.getElementById('p-ph').value=p.ph||'';document.getElementById('p-wa').value=p.wa||'';document.getElementById('p-em').value=p.em||'';document.getElementById('p-addr').value=p.addr||'';document.getElementById('p-aid').value=p.aid||'';document.getElementById('p-aidnum').value=p.aidnum||'';document.getElementById('p-aidplan').value=p.aidplan||'';document.getElementById('p-principal').value=p.principal||'';document.getElementById('p-allerg').value=p.allerg||'';document.getElementById('p-chronic').value=p.chronic||'';document.getElementById('p-emer').value=p.emer||'';openM('m-patient');}
+function showAddPatient(){editPID=null;document.getElementById('p-id-hint').textContent='';document.getElementById('m-patient-title').textContent='Add New Patient';['fn','ln','id','ph','wa','em','aidnum','aidplan','principal','allerg','chronic','emer'].forEach(f=>{const el=document.getElementById('p-'+f);if(el)el.value=''});document.getElementById('p-dob').value='';document.getElementById('p-addr').value='';document.getElementById('p-aid').value='';document.getElementById('p-gen').value='Female';document.getElementById('p-bl').value='';openM('m-patient');}
+function editPat(id){const p=gp(id);editPID=id;document.getElementById('m-patient-title').textContent='Edit Patient';['fn','ln','dob','idnum','gen','bl','ph','wa','em'].forEach(k=>{const el=document.getElementById('p-'+k.replace('idnum','id').replace('gen','gen').replace('bl','bl'));if(el)el.value=p[k]||p[k.replace('fn','fn').replace('ln','ln')]||''});document.getElementById('p-fn').value=p.fn;document.getElementById('p-ln').value=p.ln;document.getElementById('p-dob').value=p.dob||'';document.getElementById('p-id').value=p.idnum||'';document.getElementById('p-gen').value=p.gen||'Female';document.getElementById('p-bl').value=p.bl||'';document.getElementById('p-ph').value=p.ph||'';document.getElementById('p-wa').value=p.wa||'';document.getElementById('p-em').value=p.em||'';document.getElementById('p-addr').value=p.addr||'';document.getElementById('p-aid').value=p.aid||'';document.getElementById('p-aidnum').value=p.aidnum||'';document.getElementById('p-aidplan').value=p.aidplan||'';document.getElementById('p-principal').value=p.principal||'';document.getElementById('p-allerg').value=p.allerg||'';document.getElementById('p-chronic').value=p.chronic||'';document.getElementById('p-emer').value=p.emer||'';openM('m-patient');validatePId(false);}
 function aidPill(p){const pi=MedicalAid.statusPill(p.aidstatus||'unverified');return `<span class="pill ${pi.cls}" style="cursor:pointer" title="Click to verify medical aid" onclick="event.stopPropagation();verifyAid('${p.id}')">${pi.label}</span>`;}
 function validatePAid(){const aid=document.getElementById('p-aid').value,num=document.getElementById('p-aidnum').value.trim(),err=document.getElementById('p-aidnum-err');if(!aid||!num){err.textContent='';return}const v=MedicalAid.validate(aid,num);err.textContent=v.status==='format_invalid'?v.message:'';}
 async function verifyAid(id){
@@ -1615,7 +1615,20 @@ async function verifyAid(id){
   if(confirm(msg+'\n\nHave you confirmed this membership with '+(v.scheme||p.aid)+' (phone or provider portal)?\nOK = mark Verified, Cancel = leave Unverified.')){p.aidstatus='verified';toast('Medical aid marked as verified','success');}
   renderPats();
 }
+function validatePId(autofill){
+  const idEl=document.getElementById('p-id'),dobEl=document.getElementById('p-dob'),genEl=document.getElementById('p-gen'),hint=document.getElementById('p-id-hint');
+  let v=MedicalAid.validateSAId(idEl.value,{dob:dobEl.value,gender:genEl.value});
+  if(autofill&&v.status==='valid'){
+    if(!dobEl.value) dobEl.value=v.dob;
+    if(/^(Male|Female)$/.test(genEl.value)) genEl.value=v.gender;
+    v=MedicalAid.validateSAId(idEl.value,{dob:dobEl.value,gender:genEl.value});
+  }
+  hint.style.color=v.status==='invalid'?'var(--danger)':v.status==='valid'?(v.warnings.length?'#d97706':'#16a34a'):'var(--ink2)';
+  hint.textContent=[v.message,...(v.warnings||[])].filter(Boolean).join(' ');
+  return v;
+}
 function savePat(){
+  if(validatePId(false).status==='invalid'){toast('Please correct the SA ID number','error');return}
   const fn2=document.getElementById('p-fn').value.trim(),ln2=document.getElementById('p-ln').value.trim();
   if(!fn2||!ln2){toast('Enter first and last name','error');return}
   const d={fn:fn2,ln:ln2,dob:document.getElementById('p-dob').value,idnum:document.getElementById('p-id').value.trim(),gen:document.getElementById('p-gen').value,bl:document.getElementById('p-bl').value,ph:document.getElementById('p-ph').value.trim(),wa:document.getElementById('p-wa').value.trim()||document.getElementById('p-ph').value.trim(),em:document.getElementById('p-em').value.trim(),addr:document.getElementById('p-addr').value.trim(),aid:document.getElementById('p-aid').value,aidnum:document.getElementById('p-aidnum').value.trim(),aidplan:document.getElementById('p-aidplan').value.trim(),principal:document.getElementById('p-principal').value.trim(),allerg:document.getElementById('p-allerg').value.trim(),chronic:document.getElementById('p-chronic').value.trim(),emer:document.getElementById('p-emer').value.trim(),col:['#2563eb','#7c3aed','#d97706','#be185d','#0891b2','#16a34a'][Math.floor(Math.random()*6)]};
