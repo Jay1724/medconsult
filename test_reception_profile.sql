@@ -10,7 +10,7 @@
 --   3. Run this whole file. Plain statements only; safe to run more than once.
 --
 -- Creates (or reuses): MedConsult Test Practice, Dr. Test Doctor (owner, no
--- login), a receptionist profile for the login, 4 test patients
+-- login, works every day 08:00 to 17:00), a receptionist profile for the login, 4 test patients
 -- (emails end in @medconsult.test) and 3 appointments today.
 -- The last statement shows what was set up. Remove it all with
 -- test_reception_cleanup.sql.
@@ -33,6 +33,14 @@ SELECT pr.id, d.id, 'owner', 'active', 'doctor@medconsult.test', now()
 FROM practices pr, doctors d
 WHERE pr.name = 'MedConsult Test Practice' AND d.email = 'doctor@medconsult.test'
   AND NOT EXISTS (SELECT 1 FROM practice_members m WHERE m.practice_id = pr.id AND m.doctor_id = d.id);
+
+-- 3b. Working hours for the test doctor: every day 08:00 to 17:00, 15 minute slots
+--     (day_of_week 0 = Sunday … 6 = Saturday)
+INSERT INTO availability (doctor_id, day_of_week, start_time, end_time, slot_minutes, is_active)
+SELECT d.id, dow, '08:00', '17:00', 15, true
+FROM doctors d, generate_series(0, 6) AS dow
+WHERE d.email = 'doctor@medconsult.test'
+  AND NOT EXISTS (SELECT 1 FROM availability a WHERE a.doctor_id = d.id AND a.day_of_week = dow);
 
 -- 4. Receptionist profile for the login
 INSERT INTO doctors (auth_id, first_name, last_name, name, email, spec)

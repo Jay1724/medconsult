@@ -4,6 +4,7 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 DELETE FROM appointments     WHERE practice_id IN (SELECT id FROM practices WHERE name = 'MedConsult Test Practice');
 DELETE FROM patients         WHERE email LIKE '%@medconsult.test';
+DELETE FROM availability     WHERE doctor_id IN (SELECT id FROM doctors WHERE email = 'doctor@medconsult.test');
 DELETE FROM practice_members WHERE practice_id IN (SELECT id FROM practices WHERE name = 'MedConsult Test Practice');
 DELETE FROM doctors          WHERE email IN ('doctor@medconsult.test', 'reception.test@medconsult.africa');
 DELETE FROM practices        WHERE name = 'MedConsult Test Practice';

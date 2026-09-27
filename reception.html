@@ -1033,10 +1033,41 @@ async function loadSlots(){
   const wrap=document.getElementById('bk-slots');
   if(!docId||!date){ wrap.innerHTML='<div style="font-size:13px;color:var(--ink3)">Select a doctor and date to see slots</div>'; return; }
   wrap.innerHTML='<div style="font-size:13px;color:var(--ink2)">Loading slots…</div>';
-  const {data,error}=await sb.rpc('get_available_slots',{p_doctor_id:docId,p_date:date});
-  if(error||!data?.length){ wrap.innerHTML='<div style="font-size:13px;color:var(--ink3)">No available slots for this date</div>'; return; }
+  const note=msg=>{ wrap.innerHTML=`<div style="font-size:13px;color:var(--ink3)">${esc(msg)}</div>`; };
   document.getElementById('bk-slot').value='';
-  wrap.innerHTML=data.map(s=>`<div class="slot-chip${s.available===false?' unavailable':''}" data-time="${s.slot_time||s}" onclick="selectSlot(this,'${s.slot_time||s}')">${fmtTime(s.slot_time||s)}</div>`).join('');
+  let {data,error}=await sb.rpc('get_available_slots',{p_doctor_id:docId,p_date:date});
+  let why='';
+  // Database function missing / failing / empty → work it out from working hours
+  if(error||!data?.length) ({slots:data,why}=await computeSlots(docId,date));
+  if(!data?.length){ note(why||'No available slots for this date'); return; }
+  wrap.innerHTML=data.map(s=>{ const t=String(s.slot_time||s).slice(0,5); return `<div class="slot-chip${s.available===false?' unavailable':''}" data-time="${t}" onclick="selectSlot(this,'${t}')">${fmtTime(t)}</div>`; }).join('');
+}
+
+/* Slots from the availability table (day_of_week 0 = Sunday … 6 = Saturday)
+   minus appointments already booked. Returns {slots, why}. */
+async function computeSlots(docId,date){
+  const dow=new Date(date+'T00:00:00').getDay();
+  const dayName=new Date(date+'T00:00:00').toLocaleDateString('en-ZA',{weekday:'long'});
+  const doc=R.doctors.find(d=>d.id===docId);
+  const who=doc?`Dr. ${doc.first_name} ${doc.last_name}`:'This doctor';
+  const {data:hours,error:he}=await sb.from('availability').select('start_time,end_time,slot_minutes,is_active').eq('doctor_id',docId).eq('day_of_week',dow);
+  if(he) return {slots:[],why:'Could not load working hours: '+he.message};
+  const day=(hours||[]).filter(h=>h.is_active!==false);
+  if(!day.length) return {slots:[],why:`${who} has no working hours on ${dayName}s. Set them in the doctor app under Calendar → Working Hours.`};
+  const {data:booked}=await sb.from('appointments').select('id,appt_time,status').eq('doctor_id',docId).eq('appt_date',date);
+  const taken=new Set((booked||[]).filter(a=>a.id!==editingApptId&&!['cancelled','no_show'].includes(String(a.status).toLowerCase())).map(a=>String(a.appt_time).slice(0,5)));
+  const toMin=t=>{ const [h,m]=String(t).split(':').map(Number); return h*60+m; };
+  const pad=n=>String(n).padStart(2,'0');
+  const nowMin=date===isoToday()?new Date().getHours()*60+new Date().getMinutes():-1;
+  const slots=[];
+  for(const h of day){
+    const step=Math.max(5,h.slot_minutes||15);
+    for(let m=toMin(h.start_time); m+step<=toMin(h.end_time); m+=step){
+      const t=`${pad(Math.floor(m/60))}:${pad(m%60)}`;
+      if(m>nowMin&&!taken.has(t)) slots.push({slot_time:t,available:true});
+    }
+  }
+  return {slots,why:slots.length?'':(nowMin>=0?`No more free slots today for ${who}.`:`${who} is fully booked on this date.`)};
 }
 
 function selectSlot(el, time){
@@ -1496,7 +1527,7 @@ async function loadDoctors(){
 function renderDoctorList(docs, appts, avail){
   const wrap=document.getElementById('doc-list');
   if(!docs.length){ wrap.innerHTML=`<div class="empty"><div class="empty-icon">🩺</div><div class="empty-title">No doctors found</div></div>`; return; }
-  const dow=new Date().getDay()||7;
+  const dow=new Date().getDay();  // 0 = Sunday … 6 = Saturday, as stored in availability
   wrap.innerHTML=docs.map(d=>{
     const todayAppts=appts.filter(a=>a.doctor_id===d.id);
     const inConsult=todayAppts.some(a=>a.status==='in_consultation');
@@ -1524,7 +1555,7 @@ async function viewDoctor(id){
   const {data:avail}=await sb.from('availability').select('*,is_available:is_active').eq('doctor_id',id);
   const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const schedHtml=`<div class="avail-week">${days.map((day,i)=>{
-    const dow=i+1;
+    const dow=(i+1)%7;  // Mon…Sun → 1…6, 0
     const slot=(avail||[]).find(a=>a.day_of_week===dow);
     return `<div class="avail-day-col">
       <div class="avail-day-hd">${day}</div>
