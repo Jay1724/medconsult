@@ -167,6 +167,34 @@ nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 48px;height:64px;
 .btn-pricing-ghost:hover{background:var(--grey-100)}
 .btn-pricing-primary{background:var(--azure);color:var(--white);box-shadow:var(--shadow-azure)}
 .btn-pricing-primary:hover{background:var(--azure-light);transform:translateY(-1px)}
+.plan-fit-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:40px}
+.plan-fit-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:28px;box-shadow:var(--shadow-sm)}
+.plan-fit-card.featured{border-color:var(--azure-border);box-shadow:0 0 0 1px var(--azure-border),var(--shadow-sm)}
+.plan-fit-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--azure);margin-bottom:8px}
+.plan-fit-title{font-family:'Playfair Display',serif;font-size:21px;font-weight:600;color:var(--black);letter-spacing:-0.4px;line-height:1.3;margin-bottom:14px}
+.plan-fit-list{list-style:none;margin-bottom:18px}
+.plan-fit-list li{display:flex;gap:9px;font-size:14px;color:var(--grey-600);line-height:1.55;margin-bottom:9px}
+.plan-fit-list li::before{content:'→';color:var(--azure);font-weight:700;flex-shrink:0}
+.plan-fit-not{font-size:13px;color:var(--grey-400);line-height:1.55;border-top:1px solid var(--border);padding-top:14px}
+.plan-fit-not strong{color:var(--grey-600);font-weight:600}
+.cost-examples{margin-top:56px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;box-shadow:var(--shadow-sm)}
+.cost-examples-head{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+.cost-examples-head h3{font-family:'Playfair Display',serif;font-size:24px;font-weight:600;letter-spacing:-0.5px;color:var(--black)}
+.cost-examples-head p{font-size:13px;color:var(--grey-400)}
+.cost-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.cost-cell{background:var(--white);padding:18px 20px}
+.cost-who{font-size:13.5px;color:var(--grey-600);margin-bottom:6px;line-height:1.45}
+.cost-amt{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;color:var(--black);letter-spacing:-1px;line-height:1.1}
+.cost-amt span{font-family:'Sora',sans-serif;font-size:12px;font-weight:400;color:var(--grey-400);letter-spacing:0;margin-left:3px}
+.cost-plan{font-size:12px;color:var(--azure);font-weight:600;margin-top:4px}
+.pricing-faq{max-width:760px;margin:64px auto 0}
+.pricing-faq h3{font-family:'Playfair Display',serif;font-size:26px;font-weight:600;letter-spacing:-0.5px;text-align:center;margin-bottom:24px;color:var(--black)}
+.pricing-faq details{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;padding:0 20px}
+.pricing-faq summary{cursor:pointer;list-style:none;padding:18px 0;font-size:15px;font-weight:600;color:var(--black);display:flex;justify-content:space-between;gap:16px}
+.pricing-faq summary::-webkit-details-marker{display:none}
+.pricing-faq summary::after{content:'+';color:var(--azure);font-size:20px;line-height:1;font-weight:400}
+.pricing-faq details[open] summary::after{content:'–'}
+.pricing-faq details p{font-size:14px;color:var(--grey-500);line-height:1.7;padding-bottom:18px}
 .pricing-trial-note{text-align:center;margin-top:28px;font-size:13px;color:var(--grey-400)}
 .pricing-trial-note strong{color:var(--grey-600)}
 
@@ -239,6 +267,8 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
   .pricing-card.featured{transform:scale(1)}
   .stats-inner{grid-template-columns:repeat(2,1fr);gap:32px}
   .persona-grid,.testimonials-grid{grid-template-columns:1fr 1fr}
+  .plan-fit-grid{grid-template-columns:1fr;max-width:560px;margin-left:auto;margin-right:auto}
+  .cost-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:768px){
   nav{padding:0 20px}
@@ -253,6 +283,8 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
   .footer-inner{grid-template-columns:1fr 1fr;gap:32px}
   .footer-bottom{flex-direction:column;gap:12px;text-align:center}
   .compare-table{display:none}
+  .cost-examples{padding:24px 20px}
+  .cost-grid{grid-template-columns:1fr}
 }
 @media(max-width:480px){
   .hero-actions,.cta-actions{flex-direction:column;width:100%}
@@ -436,13 +468,13 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       <div class="persona-emoji"><span class="material-icons">medical_services</span></div>
       <div class="persona-title">Solo GP</div>
       <div class="persona-desc">You see 20–40 patients a day and spend too much time on admin. MedConsult cuts paperwork so you can focus on what matters.</div>
-      <ul class="persona-points"><li>Issue sick notes in under 30 seconds</li><li>Generate prescriptions with your signature instantly</li><li>Patients book themselves — no reception needed</li><li>Submit medical aid claims with one click</li><li>Start at R 299/month, cancel anytime</li></ul>
+      <ul class="persona-points"><li>Issue sick notes in under 30 seconds</li><li>Generate prescriptions with your signature instantly</li><li>Patients book themselves online on Professional, no receptionist needed</li><li>Submit medical aid claims with one click</li><li>Start at R 299/month, cancel anytime</li></ul>
     </div>
     <div class="persona-card reveal reveal-delay-1">
       <div class="persona-emoji"><span class="material-icons">local_hospital</span></div>
       <div class="persona-title">Group Practice</div>
       <div class="persona-desc">You manage multiple doctors, a reception desk and hundreds of patients. MedConsult gives everyone the right access to the right information.</div>
-      <ul class="persona-points"><li>Unlimited doctors under one subscription</li><li>Receptionist portal with booking access only</li><li>Clinical records locked to treating doctor</li><li>Shared patient calendar across all doctors</li><li>Practice-wide reporting and billing</li></ul>
+      <ul class="persona-points"><li>R 449 per doctor, never more than R 2,990/month</li><li>Receptionist portal with booking access only</li><li>Clinical records locked to treating doctor</li><li>Shared patient calendar across all doctors</li><li>Practice-wide reporting and billing</li></ul>
     </div>
     <div class="persona-card reveal reveal-delay-2">
       <div class="persona-emoji"><span class="material-icons">medical_services</span></div>
@@ -485,21 +517,22 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
   <div class="reveal" style="text-align:center">
     <div class="section-eyebrow" style="justify-content:center">Simple pricing</div>
     <h2 class="section-title">Start free. Scale as you grow.</h2>
-    <p class="section-subtitle" style="margin:0 auto">No setup fees. No contracts. No surprises. Cancel anytime.</p>
+    <p class="section-subtitle" style="margin:0 auto">Published prices. No setup fees. No contracts. No percentage of your billings. Cancel anytime.</p>
   </div>
   <div class="pricing-grid">
     <div class="pricing-card reveal">
       <div class="pricing-name">Starter</div>
       <div class="pricing-price">R 299<span class="pricing-price-sub">/mo</span></div>
-      <div class="pricing-period">For solo doctors starting out</div>
+      <div class="pricing-period">For solo doctors who run their own diary and admin</div>
       <div class="pricing-divider"></div>
       <ul class="pricing-features">
-        <li><span class="check">✓</span>Up to 50 active patients</li>
+        <li><span class="check">✓</span>Unlimited patients</li>
         <li><span class="check">✓</span>Medical records &amp; history</li>
         <li><span class="check">✓</span>Sick notes &amp; prescriptions</li>
         <li><span class="check">✓</span>Invoicing with VAT</li>
         <li><span class="check">✓</span>Medical aid claims</li>
         <li><span class="check">✓</span>WhatsApp video calls</li>
+        <li><span class="check">✓</span>Email support</li>
         <li class="dimmed"><span class="cross">—</span>Patient booking portal</li>
         <li class="dimmed"><span class="cross">—</span>Receptionist accounts</li>
         <li class="dimmed"><span class="cross">—</span>Multi-doctor calendar</li>
@@ -510,17 +543,16 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       <div class="pricing-badge">Most Popular</div>
       <div class="pricing-name">Professional</div>
       <div class="pricing-price" style="color:white">R 599<span class="pricing-price-sub" style="color:rgba(255,255,255,.4)">/mo</span></div>
-      <div class="pricing-period">For established solo practitioners</div>
+      <div class="pricing-period">For solo doctors who want patients to book online</div>
       <div class="pricing-divider"></div>
       <ul class="pricing-features">
-        <li><span class="check">✓</span>Unlimited patients</li>
         <li><span class="check">✓</span>Everything in Starter</li>
         <li><span class="check">✓</span>Patient booking portal</li>
         <li><span class="check">✓</span>Patient mobile app access</li>
         <li><span class="check">✓</span>Online appointment calendar</li>
         <li><span class="check">✓</span>Availability management</li>
         <li><span class="check">✓</span>Priority email support</li>
-        <li class="dimmed"><span class="cross">—</span>Receptionist accounts</li>
+        <li><span class="check">✓</span>Add a receptionist for R 149/mo</li>
         <li class="dimmed"><span class="cross">—</span>Multi-doctor management</li>
       </ul>
       <button class="btn-pricing btn-pricing-primary" onclick="location.href='doctor.html'">Start Free Trial →</button>
@@ -528,14 +560,14 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
     <div class="pricing-card reveal reveal-delay-2">
       <div class="pricing-badge" style="background:var(--black);color:white">Practice Plan</div>
       <div class="pricing-name">Practice</div>
-      <div class="pricing-price">R 5,000<span class="pricing-price-sub">/mo</span></div>
-      <div class="pricing-period">For practices with 2+ doctors</div>
+      <div class="pricing-price">R 449<span class="pricing-price-sub">/doctor/mo</span></div>
+      <div class="pricing-period">For 2+ doctors sharing a front desk · never more than R 2,990/mo</div>
       <div class="pricing-divider"></div>
       <ul class="pricing-features">
-        <li><span class="check">✓</span>Unlimited doctors</li>
+        <li><span class="check">✓</span>Add as many doctors as you need</li>
         <li><span class="check">✓</span>Unlimited patients</li>
         <li><span class="check">✓</span>Everything in Professional</li>
-        <li><span class="check">✓</span>Receptionist portal &amp; accounts</li>
+        <li><span class="check">✓</span>Unlimited receptionist accounts</li>
         <li><span class="check">✓</span>Multi-doctor shared calendar</li>
         <li><span class="check">✓</span>Practice-wide reporting</li>
         <li><span class="check">✓</span>Role-based permissions</li>
@@ -545,7 +577,60 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       <button class="btn-pricing btn-pricing-primary" onclick="location.href='practice.html'">Register Your Practice →</button>
     </div>
   </div>
-  <p class="pricing-trial-note reveal">All plans include a <strong>30-day free trial</strong>. No credit card required to start. Cancel anytime with no fees.</p>
+  <p class="pricing-trial-note reveal">All plans include a <strong>30-day free trial</strong>. No credit card required to start. Cancel anytime with no fees.<br>Pay annually and get <strong>2 months free</strong>. <strong>Free data migration</strong> from your current system. Electronic medical aid claims are passed through at the switching house's per-claim rate, with no markup.</p>
+
+  <div class="reveal" style="margin-top:72px;text-align:center">
+    <h3 style="font-family:'Playfair Display',serif;font-size:26px;font-weight:600;letter-spacing:-0.5px;margin-bottom:4px">Which plan is right for you?</h3>
+    <p style="font-size:14px;color:var(--grey-400)">Every plan includes the full clinical toolkit. The difference is who books, and how many doctors share the practice.</p>
+  </div>
+  <div class="plan-fit-grid">
+    <div class="plan-fit-card reveal">
+      <div class="plan-fit-label">Starter · R 299/mo</div>
+      <div class="plan-fit-title">You work alone and manage your own bookings</div>
+      <ul class="plan-fit-list">
+        <li>Patients phone or WhatsApp you to book, and you capture it yourself</li>
+        <li>You want digital records, sick notes, scripts, invoices and claims in one place</li>
+        <li>You're newly in private practice and want to keep costs low</li>
+      </ul>
+      <div class="plan-fit-not"><strong>Not included:</strong> online self-booking, the patient app or receptionist access.</div>
+    </div>
+    <div class="plan-fit-card featured reveal reveal-delay-1">
+      <div class="plan-fit-label">Professional · R 599/mo</div>
+      <div class="plan-fit-title">You work alone and want patients to book themselves</div>
+      <ul class="plan-fit-list">
+        <li>Patients book online around the working hours you set, day or night</li>
+        <li>Patients see their appointments, sick notes and scripts in the MedConsult app</li>
+        <li>Have a receptionist? Add a login for them for R 149/mo</li>
+      </ul>
+      <div class="plan-fit-not"><strong>Not included:</strong> more than one doctor, a shared calendar or practice-wide reporting.</div>
+    </div>
+    <div class="plan-fit-card reveal reveal-delay-2">
+      <div class="plan-fit-label">Practice · R 449 per doctor/mo</div>
+      <div class="plan-fit-title">Two or more doctors share one practice and front desk</div>
+      <ul class="plan-fit-list">
+        <li>Reception books across every doctor's diary in one shared calendar</li>
+        <li>Each role gets the right access: reception sees bookings, while clinical notes stay with the treating doctor</li>
+        <li>Practice-wide reports on revenue, appointments and patients, plus a dedicated account manager</li>
+      </ul>
+      <div class="plan-fit-not"><strong>Price is capped:</strong> from 7 doctors you pay R 2,990/mo, however many you add.</div>
+    </div>
+  </div>
+
+  <div class="cost-examples reveal">
+    <div class="cost-examples-head">
+      <h3>What you'll pay each month</h3>
+      <p>All prices incl. VAT · pay annually and get 2 months free</p>
+    </div>
+    <div class="cost-grid">
+      <div class="cost-cell"><div class="cost-who">Solo doctor, own bookings</div><div class="cost-amt">R 299<span>/mo</span></div><div class="cost-plan">Starter</div></div>
+      <div class="cost-cell"><div class="cost-who">Solo doctor with online booking</div><div class="cost-amt">R 599<span>/mo</span></div><div class="cost-plan">Professional</div></div>
+      <div class="cost-cell"><div class="cost-who">Solo doctor with a receptionist</div><div class="cost-amt">R 748<span>/mo</span></div><div class="cost-plan">Professional + receptionist</div></div>
+      <div class="cost-cell"><div class="cost-who">2 doctors, shared reception</div><div class="cost-amt">R 898<span>/mo</span></div><div class="cost-plan">Practice · 2 × R 449</div></div>
+      <div class="cost-cell"><div class="cost-who">4 doctors, shared reception</div><div class="cost-amt">R 1,796<span>/mo</span></div><div class="cost-plan">Practice · 4 × R 449</div></div>
+      <div class="cost-cell"><div class="cost-who">7 or more doctors</div><div class="cost-amt">R 2,990<span>/mo</span></div><div class="cost-plan">Practice · capped</div></div>
+    </div>
+  </div>
+
   <div class="reveal" style="margin-top:56px;text-align:center">
     <h3 style="font-family:'Playfair Display',serif;font-size:26px;font-weight:600;letter-spacing:-0.5px;margin-bottom:4px">Compare all features</h3>
     <p style="font-size:14px;color:var(--grey-400)">Exactly what's included in each plan</p>
@@ -557,7 +642,7 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       <tr><td>Patient profiles &amp; records</td><td class="yes">✓</td><td class="yes highlight-col">✓</td><td class="yes">✓</td></tr>
       <tr><td>Medical history &amp; notes</td><td class="yes">✓</td><td class="yes highlight-col">✓</td><td class="yes">✓</td></tr>
       <tr><td>Allergies &amp; chronic conditions</td><td class="yes">✓</td><td class="yes highlight-col">✓</td><td class="yes">✓</td></tr>
-      <tr><td>Patient count limit</td><td>50 patients</td><td class="highlight-col">Unlimited</td><td>Unlimited</td></tr>
+      <tr><td>Patient count limit</td><td>Unlimited</td><td class="highlight-col">Unlimited</td><td>Unlimited</td></tr>
       <tr class="compare-section"><td colspan="4">Documents &amp; Clinical</td></tr>
       <tr><td>Sick notes (medical certificates)</td><td class="yes">✓</td><td class="yes highlight-col">✓</td><td class="yes">✓</td></tr>
       <tr><td>Electronic prescriptions</td><td class="yes">✓</td><td class="yes highlight-col">✓</td><td class="yes">✓</td></tr>
@@ -573,13 +658,25 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       <tr><td>Availability management</td><td class="no">—</td><td class="yes highlight-col">✓</td><td class="yes">✓</td></tr>
       <tr><td>Multi-doctor shared calendar</td><td class="no">—</td><td class="no highlight-col">—</td><td class="yes">✓</td></tr>
       <tr class="compare-section"><td colspan="4">Team &amp; Practice</td></tr>
-      <tr><td>Doctor accounts</td><td>1 doctor</td><td class="highlight-col">1 doctor</td><td>Unlimited</td></tr>
-      <tr><td>Receptionist portal</td><td class="no">—</td><td class="no highlight-col">—</td><td class="yes">✓</td></tr>
+      <tr><td>Doctor accounts</td><td>1 doctor</td><td class="highlight-col">1 doctor</td><td>2+ (R 449 each)</td></tr>
+      <tr><td>Receptionist portal</td><td class="no">—</td><td class="highlight-col">R 149/mo add-on</td><td>Unlimited</td></tr>
       <tr><td>Role-based permissions</td><td class="no">—</td><td class="no highlight-col">—</td><td class="yes">✓</td></tr>
       <tr><td>Practice-wide reporting</td><td class="no">—</td><td class="no highlight-col">—</td><td class="yes">✓</td></tr>
       <tr><td>Dedicated account manager</td><td class="no">—</td><td class="no highlight-col">—</td><td class="yes">✓</td></tr>
+      <tr class="compare-section"><td colspan="4">Support</td></tr>
+      <tr><td>Support channel</td><td>Email</td><td class="highlight-col">Priority email</td><td>Priority phone &amp; email</td></tr>
     </tbody>
   </table>
+
+  <div class="pricing-faq reveal">
+    <h3>Pricing questions</h3>
+    <details><summary>Can I start on one plan and switch later?</summary><p>Yes. You can move between Starter and Professional at any time from your Subscription page. The new price applies from your next billing date. When a second doctor joins, let us know and we'll move you onto the Practice plan.</p></details>
+    <details><summary>How is the Practice plan billed?</summary><p>R 449 for each doctor account active on your billing date, with a minimum of two doctors. The total never goes above R 2,990 a month, so from seven doctors adding more costs nothing extra. Receptionist accounts are unlimited and free.</p></details>
+    <details><summary>Do you charge a percentage of my billings or claims?</summary><p>No. You pay a flat monthly fee. When you submit electronic medical aid claims, the switching house charges a small per-claim fee (usually around R 6). We pass that fee on at cost, with no markup, and list it on your monthly invoice.</p></details>
+    <details><summary>Is there a setup fee or contract?</summary><p>No setup fee and no contract. Every plan starts with a 30-day free trial, with no card required, and you can cancel at any time. We'll also move your patient data from your current system for free.</p></details>
+    <details><summary>Is there a discount for paying annually?</summary><p>Yes. Pay for a year upfront and you pay for 10 months, so 2 months are free.</p></details>
+    <details><summary>Do my patients pay anything?</summary><p>No. The patient portal and app are free for your patients.</p></details>
+  </div>
 </section>
 </div>
 

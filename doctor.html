@@ -738,14 +738,14 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
           <div class="plan-grid">
             <div class="plan-card" id="pc-starter" onclick="selPlan('starter')">
               <div class="plan-name">Starter</div>
-              <div class="plan-price">R 699<span>/month</span></div>
-              <div class="plan-features">Up to 50 patients<br>All core features<br>Sick notes & scripts</div>
+              <div class="plan-price">R 299<span>/month</span></div>
+              <div class="plan-features">Unlimited patients<br>All core features<br>Sick notes & scripts</div>
             </div>
             <div class="plan-card selected" id="pc-pro" onclick="selPlan('pro')">
               <div class="plan-badge">POPULAR</div>
               <div class="plan-name">Professional</div>
-              <div class="plan-price">R 999<span>/month</span></div>
-              <div class="plan-features">Unlimited patients<br>All features + API<br>Priority support</div>
+              <div class="plan-price">R 599<span>/month</span></div>
+              <div class="plan-features">Everything in Starter<br>Booking portal & patient app<br>Priority support</div>
             </div>
           </div>
           <div class="pay-section">
@@ -942,6 +942,7 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
         <div class="card"><div class="card-header"><div class="card-title">Current Plan</div></div><div id="sub-plan-body" style="padding:20px"></div></div>
         <div class="card"><div class="card-header"><div class="card-title">Payment Method</div></div><div id="sub-pay-body" style="padding:20px"></div></div>
+        <div class="card" style="grid-column:1/-1"><div class="card-header"><div class="card-title">Reception Access</div><span style="font-size:12px;color:var(--ink2)">R 149/month per receptionist</span></div><div id="sub-reception-body" style="padding:20px"></div></div>
         <div class="card" style="grid-column:1/-1"><div class="card-header"><div class="card-title">Billing History</div></div><div id="sub-history" style="padding:16px 20px"></div></div>
       </div>
     </div>
@@ -1216,6 +1217,13 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
 </div>
 
 <!-- UPDATE CARD -->
+<div class="overlay" id="m-reception">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-hd"><div class="modal-title">Add a Receptionist</div><button class="modal-close" onclick="closeM('m-reception')">×</button></div>
+    <div class="modal-body" id="m-reception-body"></div>
+  </div>
+</div>
+
 <div class="overlay" id="m-card">
   <div class="modal">
     <div class="modal-hd"><div class="modal-title">Update Payment Method</div><button class="modal-close" onclick="closeM('m-card')">×</button></div>
@@ -1413,10 +1421,10 @@ function launchApp() {
   document.getElementById('sb-av').textContent=ini;
   document.getElementById('sb-name').textContent=d.name;
   document.getElementById('sb-role').textContent=d.spec;
-  document.getElementById('sb-plan').textContent=S.plan==='pro'?'PRO':'STARTER';
+  document.getElementById('sb-plan').textContent=planBadge();
   const h=new Date().getHours();const greeting=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
   document.getElementById('pg-title').textContent=`${greeting}, ${d.fn}`;
-  popSelects(); renderDash(); initSigs(); renderSub();
+  popSelects(); renderDash(); initSigs(); renderSub(); loadReception();
 }
 
 async function doLogout() {
@@ -1535,7 +1543,7 @@ function nav(pg, el) {
   if(pg==='invoices')renderInvs();
   if(pg==='claims')renderClaims();
   if(pg==='consultations')renderConsult();
-  if(pg==='subscription')renderSub();
+  if(pg==='subscription'){renderSub();loadReception();}
   if(pg==='records')popSelects();
 }
 
@@ -1878,15 +1886,186 @@ function endCall(){document.getElementById('video-area').innerHTML=`<div class="
 // ══════════════════════════════════════════════════
 //  SUBSCRIPTION
 // ══════════════════════════════════════════════════
-function renderSub(){
-  const plans={starter:{name:'Starter',price:'R 699',feat:'Up to 50 patients · All core features'},pro:{name:'Professional',price:'R 999',feat:'Unlimited patients · All features + priority support'}};
-  const cur=plans[S.plan];
-  document.getElementById('sub-badge').textContent=(S.plan==='pro'?'PRO':'STARTER')+' — Active';
-  document.getElementById('sub-plan-body').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px"><div><div style="font-size:16px;font-weight:700">${cur.name} Plan</div><div style="font-size:12px;color:var(--ink2);margin-top:4px">${cur.feat}</div></div><div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--azure)">${cur.price}<span style="font-size:12px;font-family:'Sora',sans-serif;color:var(--ink2)">/mo</span></div></div><div style="background:rgba(43,127,255,0.07);border:1px solid rgba(43,127,255,0.15);border-radius:var(--radius-sm);padding:12px;font-size:12px;color:var(--ink2);line-height:2"><b style="color:var(--azure)">✓</b> Next billing: ${new Date(Date.now()+30*24*60*60*1000).toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'})}<br><b style="color:var(--azure)">✓</b> Free trial active — 30 days remaining<br><b style="color:var(--azure)">✓</b> Auto-renews monthly · Cancel anytime</div><div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px"><div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--ink2)">Switch Plan</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${Object.entries(plans).map(([k,p])=>`<div onclick="switchPlan('${k}')" style="border:1.5px solid ${k===S.plan?'var(--azure)':'var(--border)'};background:${k===S.plan?'rgba(43,127,255,0.06)':'var(--white)'};border-radius:var(--radius-sm);padding:12px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--azure)'" onmouseout="this.style.borderColor='${k===S.plan?'var(--azure)':'var(--border)'}'"><div style="font-weight:600;font-size:12.5px">${p.name}</div><div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--azure)">${p.price}<span style="font-size:10px;font-family:'Sora',sans-serif;color:var(--ink2)">/mo</span></div>${k===S.plan?'<div style="font-size:11px;color:var(--azure);margin-top:3px">Current ✓</div>':'<div style="font-size:11px;color:var(--ink2);margin-top:3px">Switch →</div>'}</div>`).join('')}</div></div>`;
-  document.getElementById('sub-pay-body').innerHTML=`<div style="display:flex;align-items:center;gap:12px;background:var(--grey-50);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px"><div style="font-size:24px">💳</div><div><div style="font-weight:500">Visa ending in 4242</div><div style="font-size:12px;color:var(--ink2)">Expires 12 / 28</div></div><span class="pill pill-green" style="margin-left:auto">Active</span></div><div style="font-size:12px;color:var(--ink2);margin-bottom:16px">Billing currency: ZAR · VAT included where applicable</div><button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="openM('m-card')">💳 Update Payment Method</button><button class="btn btn-ghost" style="width:100%;color:var(--danger)" onclick="if(confirm('Cancel your MedConsult subscription?'))toast('Subscription cancelled. Active until end of billing period.')">Cancel Subscription</button>`;
-  document.getElementById('sub-history').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;padding:6px 0;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--ink2);border-bottom:1px solid var(--border)">Date</th><th style="text-align:left;padding:6px 0;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--ink2);border-bottom:1px solid var(--border)">Description</th><th style="text-align:right;padding:6px 0;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--ink2);border-bottom:1px solid var(--border)">Amount</th><th style="padding:6px 0;border-bottom:1px solid var(--border)"></th></tr></thead><tbody><tr><td style="padding:11px 0;border-bottom:1px solid var(--border);color:var(--ink2);font-family:'JetBrains Mono',monospace;font-size:12px">2026-04-01</td><td style="padding:11px 0;border-bottom:1px solid var(--border)">MedConsult ${cur.name} — Free Trial</td><td style="padding:11px 0;border-bottom:1px solid var(--border);text-align:right;font-weight:600">R 0.00</td><td style="padding:11px 0;border-bottom:1px solid var(--border);text-align:right"><span class="pill pill-green">Paid</span></td></tr><tr><td style="padding:11px 0;color:var(--ink2);font-family:'JetBrains Mono',monospace;font-size:12px">2026-05-01</td><td style="padding:11px 0">MedConsult ${cur.name} — Monthly (upcoming)</td><td style="padding:11px 0;text-align:right;font-weight:600">${cur.price}.00</td><td style="padding:11px 0;text-align:right"><span class="pill pill-yellow">Upcoming</span></td></tr></tbody></table>`;
+const PLANS={starter:{name:'Starter',price:299,feat:'Unlimited patients · All core features'},pro:{name:'Professional',price:599,feat:'Booking portal · Patient app · Priority support'}};
+const RECEPTION_ADDON_PRICE=149;
+/* Receptionist add-on state. A Professional doctor who adds a receptionist gets a
+   private one-doctor practice (plan 'solo') so the reception portal and its
+   practice_invites / practice_members flow work unchanged. */
+const RX={loaded:false,practiceId:null,members:[],invites:[]};
+
+function escH(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmtR(n){return 'R '+n.toLocaleString('en-ZA')}
+function planBadge(){return S.plan==='pro'?'PRO':S.plan==='practice'?'PRACTICE':'STARTER'}
+function receptionSeats(){return RX.members.length+RX.invites.length}
+function monthlyTotal(){return PLANS[S.plan].price+(S.plan==='pro'?receptionSeats()*RECEPTION_ADDON_PRICE:0)}
+function priceBreakdown(){
+  const n=S.plan==='pro'?receptionSeats():0;
+  if(!n) return '';
+  return `<div style="font-size:12px;color:var(--ink2);margin:-6px 0 14px">${PLANS.pro.name} ${fmtR(PLANS.pro.price)} + ${n} receptionist${n>1?'s':''} × ${fmtR(RECEPTION_ADDON_PRICE)}</div>`;
 }
-function switchPlan(p){if(p===S.plan){toast('Already on this plan');return}S.plan=p;document.getElementById('sb-plan').textContent=p==='pro'?'PRO':'STARTER';renderSub();toast('Plan changed to '+(p==='pro'?'Professional':'Starter'),'success');}
+
+function renderSub(){
+  document.getElementById('sb-plan').textContent=planBadge();
+  if(S.plan==='practice'){
+    document.getElementById('sub-badge').textContent='PRACTICE — Active';
+    document.getElementById('sub-plan-body').innerHTML=`<div style="font-size:16px;font-weight:700;margin-bottom:6px">Practice Plan</div><div style="font-size:13px;color:var(--ink2);line-height:1.6">Your subscription, receptionists and billing are managed by your practice owner in the Practice Portal.</div>`;
+    document.getElementById('sub-pay-body').innerHTML=`<div style="font-size:13px;color:var(--ink2)">Billed to your practice.</div>`;
+    document.getElementById('sub-reception-body').innerHTML=`<div style="font-size:13px;color:var(--ink2)">Reception staff are invited by your practice owner.</div>`;
+    document.getElementById('sub-history').innerHTML='';
+    return;
+  }
+  const plans=Object.fromEntries(Object.entries(PLANS).map(([k,p])=>[k,{...p,price:fmtR(p.price)}]));
+  const cur=plans[S.plan];
+  document.getElementById('sub-badge').textContent=planBadge()+' — Active';
+  document.getElementById('sub-plan-body').innerHTML=`<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px"><div><div style="font-size:16px;font-weight:700">${cur.name} Plan</div><div style="font-size:12px;color:var(--ink2);margin-top:4px">${cur.feat}</div></div><div style="font-family:'Playfair Display',serif;font-size:26px;color:var(--azure)">${fmtR(monthlyTotal())}<span style="font-size:12px;font-family:'Sora',sans-serif;color:var(--ink2)">/mo</span></div></div>${priceBreakdown()}<div style="background:rgba(43,127,255,0.07);border:1px solid rgba(43,127,255,0.15);border-radius:var(--radius-sm);padding:12px;font-size:12px;color:var(--ink2);line-height:2"><b style="color:var(--azure)">✓</b> Next billing: ${new Date(Date.now()+30*24*60*60*1000).toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'})}<br><b style="color:var(--azure)">✓</b> Free trial active — 30 days remaining<br><b style="color:var(--azure)">✓</b> Auto-renews monthly · Cancel anytime</div><div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px"><div style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--ink2)">Switch Plan</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${Object.entries(plans).map(([k,p])=>`<div onclick="switchPlan('${k}')" style="border:1.5px solid ${k===S.plan?'var(--azure)':'var(--border)'};background:${k===S.plan?'rgba(43,127,255,0.06)':'var(--white)'};border-radius:var(--radius-sm);padding:12px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='var(--azure)'" onmouseout="this.style.borderColor='${k===S.plan?'var(--azure)':'var(--border)'}'"><div style="font-weight:600;font-size:12.5px">${p.name}</div><div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--azure)">${p.price}<span style="font-size:10px;font-family:'Sora',sans-serif;color:var(--ink2)">/mo</span></div>${k===S.plan?'<div style="font-size:11px;color:var(--azure);margin-top:3px">Current ✓</div>':'<div style="font-size:11px;color:var(--ink2);margin-top:3px">Switch →</div>'}</div>`).join('')}</div></div>`;
+  document.getElementById('sub-pay-body').innerHTML=`<div style="display:flex;align-items:center;gap:12px;background:var(--grey-50);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px"><div style="font-size:24px">💳</div><div><div style="font-weight:500">Visa ending in 4242</div><div style="font-size:12px;color:var(--ink2)">Expires 12 / 28</div></div><span class="pill pill-green" style="margin-left:auto">Active</span></div><div style="font-size:12px;color:var(--ink2);margin-bottom:16px">Billing currency: ZAR · VAT included where applicable</div><button class="btn btn-ghost" style="width:100%;margin-bottom:8px" onclick="openM('m-card')">💳 Update Payment Method</button><button class="btn btn-ghost" style="width:100%;color:var(--danger)" onclick="if(confirm('Cancel your MedConsult subscription?'))toast('Subscription cancelled. Active until end of billing period.')">Cancel Subscription</button>`;
+  document.getElementById('sub-history').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;padding:6px 0;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--ink2);border-bottom:1px solid var(--border)">Date</th><th style="text-align:left;padding:6px 0;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--ink2);border-bottom:1px solid var(--border)">Description</th><th style="text-align:right;padding:6px 0;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--ink2);border-bottom:1px solid var(--border)">Amount</th><th style="padding:6px 0;border-bottom:1px solid var(--border)"></th></tr></thead><tbody><tr><td style="padding:11px 0;border-bottom:1px solid var(--border);color:var(--ink2);font-family:'JetBrains Mono',monospace;font-size:12px">2026-04-01</td><td style="padding:11px 0;border-bottom:1px solid var(--border)">MedConsult ${cur.name} — Free Trial</td><td style="padding:11px 0;border-bottom:1px solid var(--border);text-align:right;font-weight:600">R 0.00</td><td style="padding:11px 0;border-bottom:1px solid var(--border);text-align:right"><span class="pill pill-green">Paid</span></td></tr><tr><td style="padding:11px 0;color:var(--ink2);font-family:'JetBrains Mono',monospace;font-size:12px">2026-05-01</td><td style="padding:11px 0">MedConsult ${cur.name} — Monthly (upcoming)</td><td style="padding:11px 0;text-align:right;font-weight:600">${fmtR(monthlyTotal())}.00</td><td style="padding:11px 0;text-align:right"><span class="pill pill-yellow">Upcoming</span></td></tr></tbody></table>`;
+  renderReceptionCard();
+}
+
+function renderReceptionCard(){
+  const el=document.getElementById('sub-reception-body');
+  if(S.plan==='practice') return;
+  if(S.plan!=='pro'){
+    el.innerHTML=`<div style="display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap"><div style="font-size:13px;color:var(--ink2);line-height:1.6;max-width:560px">Give a receptionist their own login to book appointments, register patients and check in arrivals. Reception access is available on <b>Professional</b> for ${fmtR(RECEPTION_ADDON_PRICE)}/month per receptionist.</div><button class="btn btn-primary" onclick="switchPlan('pro')">Switch to Professional →</button></div>`;
+    return;
+  }
+  if(!RX.loaded){el.innerHTML='<div style="font-size:13px;color:var(--ink2)">Loading reception staff…</div>';return;}
+  const rows=[
+    ...RX.members.map(m=>`<tr><td style="padding:10px 0;border-bottom:1px solid var(--border)">${escH(m.email)}</td><td style="padding:10px 0;border-bottom:1px solid var(--border)"><span class="pill ${m.status==='active'?'pill-green':'pill-grey'}">${m.status==='active'?'Active':escH(m.status)}</span></td><td style="padding:10px 0;border-bottom:1px solid var(--border);text-align:right"><button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="removeReceptionist('${m.id}')">Remove</button></td></tr>`),
+    ...RX.invites.map(i=>`<tr><td style="padding:10px 0;border-bottom:1px solid var(--border)">${escH(i.email)}</td><td style="padding:10px 0;border-bottom:1px solid var(--border)"><span class="pill pill-yellow">Invite pending</span></td><td style="padding:10px 0;border-bottom:1px solid var(--border);text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-xs" onclick="copyReceptionLink('${i.token}')">Copy link</button> <button class="btn btn-ghost btn-xs" style="color:var(--danger)" onclick="cancelReceptionInvite('${i.id}')">Cancel</button></td></tr>`)
+  ].join('');
+  el.innerHTML=`<div style="font-size:13px;color:var(--ink2);line-height:1.6;margin-bottom:14px">Your receptionist signs in to the Reception Portal to book appointments, register patients and check in arrivals. The portal doesn't show your consultation notes. Each receptionist adds ${fmtR(RECEPTION_ADDON_PRICE)}/month from your next billing date.</div>${rows?`<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:14px"><tbody>${rows}</tbody></table>`:'<div style="font-size:13px;color:var(--ink2);margin-bottom:14px">No receptionists yet.</div>'}<button class="btn btn-primary" onclick="openReceptionModal()">+ Add receptionist</button>`;
+}
+
+async function getDoctorRow(){
+  const {data:{user}}=await sbClient.auth.getUser();
+  if(!user) return null;
+  const {data,error}=await sbClient.from('doctors').select('id,practice_id').eq('auth_id',user.id).maybeSingle();
+  if(error) throw error;
+  if(data) return data;
+  const d=S.doc;
+  const {data:created,error:ce}=await sbClient.from('doctors').insert({
+    auth_id:user.id,first_name:d.fn,last_name:d.ln,specialization:d.spec,
+    hpcsa_number:d.hpcsa||null,signature_name:d.sig||d.name
+  }).select('id,practice_id').single();
+  if(ce) throw ce;
+  return created;
+}
+
+async function loadReception(){
+  if(S.plan==='practice') return;
+  RX.loaded=false;RX.members=[];RX.invites=[];
+  try{
+    const {data:{user}}=await sbClient.auth.getUser();
+    const {data:own}=await sbClient.from('practice_members').select('practice_id,practices(plan)')
+      .eq('auth_id',user.id).eq('role','owner').maybeSingle();
+    RX.practiceId=own?.practices?.plan==='solo'?own.practice_id:null;
+    if(RX.practiceId){
+      const [{data:m},{data:i}]=await Promise.all([
+        sbClient.from('practice_members').select('id,email,status,created_at').eq('practice_id',RX.practiceId).eq('role','receptionist').order('created_at'),
+        sbClient.from('practice_invites').select('id,email,token,expires_at').eq('practice_id',RX.practiceId).eq('role','receptionist').eq('status','pending').gt('expires_at',new Date().toISOString()).order('created_at')
+      ]);
+      RX.members=m||[];RX.invites=i||[];
+    }
+  }catch(e){console.error(e);toast('Could not load reception staff','error');}
+  RX.loaded=true;
+  renderSub();
+}
+
+async function ensureSoloPractice(){
+  if(RX.practiceId) return RX.practiceId;
+  const doc=await getDoctorRow();
+  if(!doc) throw new Error('Please sign in again');
+  if(doc.practice_id) throw new Error('Your account already belongs to a practice. Ask the practice owner to invite reception staff.');
+  const {data:{user}}=await sbClient.auth.getUser();
+  const d=S.doc;
+  const {data:pr,error:pe}=await sbClient.from('practices').insert({
+    name:d.pracName||`${d.name} Practice`,address:d.pracAddr||null,phone:d.phone||null,
+    email:d.email,hpcsa_number:d.pracnum||null,vat_number:d.vat||null,plan:'solo'
+  }).select('id').single();
+  if(pe) throw pe;
+  const {error:de}=await sbClient.from('doctors').update({practice_id:pr.id}).eq('id',doc.id);
+  if(de) throw de;
+  const {error:me}=await sbClient.from('practice_members').insert({
+    auth_id:user.id,practice_id:pr.id,role:'owner',status:'active',email:d.email
+  });
+  if(me) throw me;
+  RX.practiceId=pr.id;
+  return pr.id;
+}
+
+function receptionLink(token){return new URL('reception.html?invite='+token,location.href).href}
+
+function openReceptionModal(){
+  if(S.plan!=='pro'){toast('Reception access is available on Professional','error');return;}
+  const n=receptionSeats()+1;
+  document.getElementById('m-reception-body').innerHTML=`
+    <div class="fg" style="margin-bottom:12px"><label>Receptionist's email</label><input type="email" id="rx-email" placeholder="reception@yourpractice.co.za"></div>
+    <div style="background:rgba(43,127,255,0.07);border:1px solid rgba(43,127,255,0.15);border-radius:var(--radius-sm);padding:12px;font-size:12px;color:var(--ink2);line-height:1.7;margin-bottom:18px">Adds <b>${fmtR(RECEPTION_ADDON_PRICE)}/month</b> from your next billing date. Your new monthly total will be <b>${fmtR(PLANS.pro.price+n*RECEPTION_ADDON_PRICE)}</b>. You'll get an invite link to send them. It expires in 7 days.</div>
+    <button class="btn btn-primary" style="width:100%" id="rx-submit" onclick="inviteReceptionist()">Create invite link</button>`;
+  openM('m-reception');
+  setTimeout(()=>document.getElementById('rx-email')?.focus(),50);
+}
+
+async function inviteReceptionist(){
+  const email=document.getElementById('rx-email').value.trim().toLowerCase();
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){toast('Please enter a valid email address','error');return;}
+  if(email===(S.doc.email||'').toLowerCase()){toast('Use your receptionist\'s own email address','error');return;}
+  if([...RX.members,...RX.invites].some(x=>(x.email||'').toLowerCase()===email)){toast('This person already has reception access or a pending invite','error');return;}
+  const btn=document.getElementById('rx-submit');
+  btn.disabled=true;btn.textContent='Creating invite…';
+  try{
+    const pid=await ensureSoloPractice();
+    const token=crypto.randomUUID();
+    const {error}=await sbClient.from('practice_invites').insert({
+      practice_id:pid,email,role:'receptionist',token,status:'pending',
+      expires_at:new Date(Date.now()+7*86400000).toISOString()
+    });
+    if(error) throw error;
+    const link=receptionLink(token);
+    document.getElementById('m-reception-body').innerHTML=`
+      <div style="font-size:13px;color:var(--ink2);line-height:1.6;margin-bottom:12px">Send this link to <b>${escH(email)}</b>. They'll set a password and can then sign in to the Reception Portal.</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;background:var(--grey-50);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;word-break:break-all;margin-bottom:16px">${escH(link)}</div>
+      <div style="display:flex;gap:8px"><button class="btn btn-ghost" style="flex:1" onclick="closeM('m-reception')">Done</button><button class="btn btn-primary" style="flex:1" onclick="copyReceptionLink('${token}')">Copy link</button></div>`;
+    toast('Invite created','success');
+    loadReception();
+  }catch(e){
+    console.error(e);
+    toast(e.message||'Could not create the invite','error');
+    btn.disabled=false;btn.textContent='Create invite link';
+  }
+}
+
+function copyReceptionLink(token){
+  const link=receptionLink(token);
+  navigator.clipboard?.writeText(link).then(()=>toast('Invite link copied','success'),()=>prompt('Copy this invite link:',link));
+}
+
+async function cancelReceptionInvite(id){
+  if(!confirm('Cancel this invite? The link will stop working.')) return;
+  const {error}=await sbClient.from('practice_invites').update({status:'cancelled'}).eq('id',id);
+  if(error){toast(error.message,'error');return;}
+  toast('Invite cancelled','success');
+  loadReception();
+}
+
+async function removeReceptionist(id){
+  if(!confirm('Remove this receptionist? They will lose access to the Reception Portal immediately, and the add-on stops from your next billing date.')) return;
+  const {error}=await sbClient.from('practice_members').delete().eq('id',id);
+  if(error){toast(error.message,'error');return;}
+  toast('Receptionist removed','success');
+  loadReception();
+}
+
+async function switchPlan(p){
+  if(p===S.plan){toast('Already on this plan');return}
+  if(p==='starter'&&receptionSeats()>0){toast('Remove your receptionists before moving to Starter','error');return}
+  const {error}=await sbClient.auth.updateUser({data:{plan:p}});
+  if(error){toast(error.message,'error');return}
+  S.plan=p;renderSub();loadReception();
+  toast('Plan changed to '+PLANS[p].name,'success');
+}
 
 // ══════════════════════════════════════════════════
 //  PRINT
