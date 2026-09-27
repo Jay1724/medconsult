@@ -299,13 +299,14 @@ tr:hover td{background:var(--grey-50)}
       <div class="reg-tagline">The complete platform for modern medical practices</div>
       <div class="price-block">
         <div class="price-plan">Practice Plan</div>
-        <div class="price-amount">R 5,000<span> / month</span></div>
+        <div class="price-amount">R 449<span> / doctor / month</span></div>
+        <div class="price-trial">Minimum 2 doctors · never more than R 2,990/month</div>
         <div class="price-trial">✅ 30-day free trial — no charge today</div>
       </div>
       <ul class="benefit-list">
-        <li><span class="bi">🩺</span><span><strong>Unlimited doctors</strong> — add your entire clinical team</span></li>
+        <li><span class="bi">🩺</span><span><strong>Pay per doctor, capped</strong> — add your whole clinical team; from 7 doctors the price stays at R 2,990</span></li>
         <li><span class="bi">👥</span><span><strong>Unlimited patients</strong> — no per-patient fees ever</span></li>
-        <li><span class="bi">🏥</span><span><strong>Reception accounts</strong> — front-desk booking and check-in portal</span></li>
+        <li><span class="bi">🏥</span><span><strong>Unlimited reception accounts</strong> — front-desk booking and check-in portal</span></li>
         <li><span class="bi">📅</span><span><strong>Shared calendar</strong> — practice-wide availability and scheduling</span></li>
         <li><span class="bi">📊</span><span><strong>Practice reporting</strong> — revenue, appointments and patient analytics</span></li>
         <li><span class="bi">📄</span><span><strong>Digital sick notes &amp; prescriptions</strong> — signed and date-stamped</span></li>
@@ -428,9 +429,9 @@ tr:hover td{background:var(--grey-50)}
           <div class="step-sub">30 days free — your card will only be charged after the trial ends</div>
           <div class="plan-summary-card">
             <div class="plan-name">Practice Plan</div>
-            <div class="plan-price">R 5,000<span> / month after trial</span></div>
+            <div class="plan-price">R 449<span> / doctor / month after trial</span></div>
             <div class="plan-includes">
-              <div class="plan-inc-item">✅ Unlimited doctors</div>
+              <div class="plan-inc-item">✅ Capped at R 2,990/month</div>
               <div class="plan-inc-item">✅ Unlimited patients</div>
               <div class="plan-inc-item">✅ Reception accounts</div>
               <div class="plan-inc-item">✅ Shared calendar</div>
@@ -1022,8 +1023,14 @@ async function sendInvite(){
 }
 
 /* ── BILLING ────────────────────────────────────────────────── */
+const PRACTICE_PER_DOCTOR=449, PRACTICE_MIN_DOCTORS=2, PRACTICE_CAP=2990;
+function practiceMonthlyPrice(doctors){
+  return Math.min(PRACTICE_CAP, PRACTICE_PER_DOCTOR*Math.max(PRACTICE_MIN_DOCTORS,doctors));
+}
 async function loadBilling(){
   const p=ST.practice;
+  const {count:docCount}=await sb.from('doctors').select('id',{count:'exact',head:true}).eq('practice_id',p?.id);
+  const monthly=practiceMonthlyPrice(docCount||0);
   const trialEnd=p?.trial_ends_at;
   const days=trialEnd?daysUntil(trialEnd):0;
   const statusLabel=trialEnd&&new Date(trialEnd)>Date.now()?`Trial — ${days} day${days!==1?'s':''} left`:'Active';
@@ -1032,13 +1039,14 @@ async function loadBilling(){
   document.getElementById('billing-content').innerHTML=`
     <div class="plan-card-dash">
       <div class="plan-card-name">Practice Plan</div>
-      <div class="plan-card-price">R 5,000<span> / month</span></div>
+      <div class="plan-card-price">R ${monthly.toLocaleString('en-ZA')}<span> / month</span></div>
       <div class="plan-card-status" style="background:rgba(255,255,255,.15);color:${statusColor}">📌 ${esc(statusLabel)}</div>
     </div>
 
     <div class="card" style="margin-bottom:16px">
       <div class="card-title">Subscription Details</div>
       <div class="billing-info-row"><span class="billing-info-label">Plan</span><span class="billing-info-value">Practice Plan</span></div>
+      <div class="billing-info-row"><span class="billing-info-label">Doctors</span><span class="billing-info-value">${docCount||0} × R ${PRACTICE_PER_DOCTOR} (min. ${PRACTICE_MIN_DOCTORS}, capped at R ${PRACTICE_CAP.toLocaleString('en-ZA')})</span></div>
       <div class="billing-info-row"><span class="billing-info-label">Status</span><span class="billing-info-value">${esc(statusLabel)}</span></div>
       <div class="billing-info-row"><span class="billing-info-label">Trial ends</span><span class="billing-info-value">${trialEnd?fmtDate(trialEnd):'—'}</span></div>
       <div class="billing-info-row"><span class="billing-info-label">Payment method</span><span class="billing-info-value">•••• •••• •••• — <span style="color:var(--ink2);font-size:12px">Not yet added</span></span></div>
@@ -1048,7 +1056,7 @@ async function loadBilling(){
     <div class="card" style="margin-bottom:16px">
       <div class="card-title">What's Included</div>
       <div class="includes-grid">
-        <div class="includes-item"><span class="ic">✅</span> Unlimited doctors</div>
+        <div class="includes-item"><span class="ic">✅</span> Per-doctor pricing, capped</div>
         <div class="includes-item"><span class="ic">✅</span> Unlimited patients</div>
         <div class="includes-item"><span class="ic">✅</span> Reception accounts</div>
         <div class="includes-item"><span class="ic">✅</span> Shared calendar</div>
