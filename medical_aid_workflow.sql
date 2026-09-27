@@ -1,7 +1,8 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- MedConsult — Medical aid verification workflow
--- Run once in the Supabase SQL editor (Dashboard → SQL Editor), after
--- medical_aid_verification.sql.
+-- Run in the Supabase SQL editor (Dashboard → SQL Editor). Self-contained:
+-- it also creates the columns from medical_aid_verification.sql if they are
+-- missing, and is safe to run more than once.
 --
 -- Adds:
 --   patients.medical_aid_dependant_code   two-digit dependant code (00 = main member)
@@ -15,6 +16,21 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ── Patient columns ─────────────────────────────────────────────────────────
+-- From medical_aid_verification.sql (no-ops if that script was already run).
+-- The check-method constraint is (re)created further down.
+ALTER TABLE patients
+  ADD COLUMN IF NOT EXISTS medical_aid_status text
+    CHECK (medical_aid_status IN ('unverified','verified','invalid')),
+  ADD COLUMN IF NOT EXISTS medical_aid_checked_at timestamptz,
+  ADD COLUMN IF NOT EXISTS medical_aid_checked_by text,
+  ADD COLUMN IF NOT EXISTS medical_aid_check_method text;
+
+UPDATE patients
+SET medical_aid_status = 'unverified'
+WHERE medical_aid_provider IS NOT NULL
+  AND medical_aid_status IS NULL;
+
+-- New in this script.
 ALTER TABLE patients
   ADD COLUMN IF NOT EXISTS medical_aid_dependant_code text
     CHECK (medical_aid_dependant_code ~ '^\d{2}$'),
