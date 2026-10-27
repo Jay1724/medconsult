@@ -870,6 +870,7 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
         <div style="font-size:13px;color:var(--ink2)"><span id="pc-count">0</span> patients registered</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-ghost" onclick="PatientAccess.openRequests()">Access requests</button>
+          <button class="btn btn-ghost" onclick="PatientAccess.openPrints()">Print requests</button>
           <button class="btn btn-ghost" onclick="PatientAccess.open()">Invite patient</button>
           <button class="btn btn-primary" onclick="showAddPatient()">+ Add Patient</button>
         </div>
@@ -1254,7 +1255,11 @@ const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // Invite patients / request access. A doctor sends requests for themselves.
-PatientAccess.init({ sb: sbClient });
+PatientAccess.init({ sb: sbClient, onOpenDoc: (kind, id) => {
+  if (kind === 'sick_note') viewSN(id);
+  else if (kind === 'prescription') viewRX(id);
+  else printRecord(id);
+} });
 
 // ══════════════════════════════════════════════════
 //  APP STATE
@@ -1293,6 +1298,19 @@ const fromSN = n => ({ id:n.id, ref:n.ref_number, pid:n.patient_id, date:n.issue
 const fromRX = x => ({ id:x.id, ref:x.ref_number, pid:x.patient_id, date:x.script_date, diag:x.diagnosis||'', rep:String(x.repeats||'0'),
   meds:Array.isArray(x.medications)?x.medications:[], sigImg:x.sig_image||'' });
 const refNum = list => list.reduce((m,x)=>Math.max(m, parseInt(String(x.ref).replace(/\D/g,''),10)||0), 0);
+
+// Print a consultation record for a patient who asked for a paper copy.
+function printRecord(id) {
+  const r = S.records.find(x => x.id === id); if (!r) { toast('Record not found', 'error'); return; }
+  const p = gp(r.pid), e = t => String(t || '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  const row = (k, v) => v ? `<tr><td style="padding:6px 12px 6px 0;color:#666;font-size:12px;vertical-align:top;white-space:nowrap">${k}</td><td style="padding:6px 0">${e(v)}</td></tr>` : '';
+  const w = window.open('', '_blank'); if (!w) { toast('Allow pop-ups to print', 'error'); return; }
+  w.document.write(`<!DOCTYPE html><html><head><title>Consultation record</title></head><body style="font-family:Arial,sans-serif;max-width:640px;margin:32px auto;color:#111">
+    <h2 style="margin:0 0 4px">Consultation record</h2><div style="color:#666;margin-bottom:20px">${e(S.doc.name)}${S.doc.hpcsa ? ' · HPCSA ' + e(S.doc.hpcsa) : ''}${S.doc.pracName ? ' · ' + e(S.doc.pracName) : ''}</div>
+    <table style="border-collapse:collapse;font-size:14px">${row('Patient', p ? fn(p) : '')}${row('Date', r.date)}${row('Type', r.type)}${row('Diagnosis', r.diag)}${row('ICD-10', r.icd)}${row('Vitals', r.vit)}${row('Notes', r.notes)}${row('Medication', r.meds)}${row('Follow-up', r.fu)}${row('Referral', r.ref)}</table>
+    <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+  w.document.close();
+}
 
 async function loadLive() {
   const { data:{ user } } = await sbClient.auth.getUser();
