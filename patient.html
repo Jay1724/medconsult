@@ -460,7 +460,7 @@ body {
     <div class="auth-tagline">Your health, at your fingertips</div>
   </div>
   <div id="invite-pill-wrap" style="display:none">
-    <div class="invite-pill">✓ Invite link detected — register below</div>
+    <div class="invite-pill" id="invite-pill-text">✓ Invite link detected — register below</div>
   </div>
   <div class="auth-tabs">
     <div class="auth-tab active" onclick="authTab('login')">Sign In</div>
@@ -480,7 +480,7 @@ body {
     <div class="field"><label>Password</label><input type="password" id="r-pw" placeholder="Min 8 characters" autocomplete="new-password"></div>
     <div class="field"><label>Confirm Password</label><input type="password" id="r-pw2" placeholder="Repeat password" autocomplete="new-password"></div>
     <button class="btn-primary" id="reg-btn" onclick="doRegister()">Create Account</button>
-    <p class="auth-note">Already have an invite link from your doctor? Open it directly to link your account automatically.</p>
+    <p class="auth-note">Create your own health profile. Doctors can only see your records after you approve their request.</p>
   </div>
   </div><!-- .auth-card -->
 </div>
@@ -507,6 +507,7 @@ body {
       <div class="tab-panel active" id="tab-home">
         <div class="greeting-hi" id="home-greeting">Hello</div>
         <div class="greeting-date" id="home-date"></div>
+        <div id="access-banner"></div>
         <div id="next-appt-wrap"></div>
         <div class="qa-grid">
           <button class="qa-btn" onclick="switchTab('appointments');setTimeout(openBooking,120)">
@@ -571,14 +572,6 @@ body {
   </div>
 </div>
 
-<!-- LINK DOCTOR SHEET -->
-<div class="sheet-overlay" id="link-doctor-overlay" onclick="linkDrOverlayTap(event)">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div id="link-doctor-body"></div>
-  </div>
-</div>
-
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -594,12 +587,21 @@ const ST = { user: null, account: null, patient: null, doctor: null };
 let inviteToken = null;
 let inviteValid = false;
 let bkStep = 1, bkDate = null, bkSlot = null, bkDoctorId = null;
-let drSearchTimer = null, drResults = [], selectedDr = null;
+let accessToken = null;   // ?access=TOKEN from a doctor's request link
+ST.access = [];
 
 // ── BOOT ─────────────────────────────────────────────
 (async () => {
   const params = new URLSearchParams(location.search);
   inviteToken = params.get('token');
+  accessToken = params.get('access');
+  if (accessToken) {
+    try { sessionStorage.setItem('mc_access_token', accessToken); } catch (e) {}
+    history.replaceState(null, '', location.pathname);   // keep the token out of the address bar and history
+  } else {
+    try { accessToken = sessionStorage.getItem('mc_access_token'); } catch (e) {}
+  }
+  if (accessToken) await previewAccessLink(accessToken);
   if (inviteToken) {
     document.getElementById('invite-pill-wrap').style.display = 'block';
     authTab('register');
@@ -613,6 +615,16 @@ let drSearchTimer = null, drResults = [], selectedDr = null;
     showAuth();
   }
 })();
+
+async function previewAccessLink(token) {
+  const { data } = await sb.rpc('get_access_link', { p_token: token });
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r) { try { sessionStorage.removeItem('mc_access_token'); } catch (e) {} accessToken = null; return; }
+  const who = 'Dr. ' + r.dr_name + (r.practice_name ? ' (' + r.practice_name + ')' : '');
+  document.getElementById('invite-pill-text').textContent = who + ' has asked for access to your records. Sign in or register to review the request.';
+  document.getElementById('invite-pill-wrap').style.display = 'block';
+  authTab('register');
+}
 
 function hideLoader() {
   const el = document.getElementById('loading-screen');
@@ -668,19 +680,19 @@ async function doRegister() {
   const email = document.getElementById('r-email').value.trim();
   const pw    = document.getElementById('r-pw').value;
   const pw2   = document.getElementById('r-pw2').value;
-  if (!inviteValid) { toast('Please use the invite link from your doctor to create your account', 'error'); return; }
+  if (!inviteValid && (!fname || !lname)) { toast('Please enter your first and last name', 'error'); return; }
   if (!email || !pw)    { toast('Please fill all fields', 'error'); return; }
   if (pw.length < 8)    { toast('Password must be at least 8 characters', 'error'); return; }
   if (pw !== pw2)       { toast('Passwords do not match', 'error'); return; }
   setBtn('reg-btn', 'Creating account…', true);
-  const { data, error } = await sb.auth.signUp({ email, password: pw });
+  const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { first_name: fname, last_name: lname } } });
   if (error) { setBtn('reg-btn', 'Create Account', false); toast(error.message, 'error'); return; }
   // The link to the patient record is made by the server (accept_patient_invite) once the
   // email is verified and matches the invite. Remember the token until then.
-  try { sessionStorage.setItem('mc_invite_token', inviteToken); } catch (e) {}
+  if (inviteToken) { try { sessionStorage.setItem('mc_invite_token', inviteToken); } catch (e) {} }
   setBtn('reg-btn', 'Create Account', false);
   if (!data.session) {
-    toast('Account created! Verify your email, then sign in to finish linking your record.', 'success');
+    toast('Account created! Verify your email, then sign in to finish setting up your profile.', 'success');
     authTab('login');
     return;
   }
@@ -709,19 +721,61 @@ async function redeemPendingInvite() {
   try { sessionStorage.removeItem('mc_invite_token'); } catch (e) {}
 }
 
+// Live columns -> the short keys the portal screens use.
+function normPatient(p) {
+  if (!p) return p;
+  return { ...p, fn: p.first_name, ln: p.last_name, idnum: p.id_number, gen: p.gender, bl: p.blood_type,
+    allerg: p.allergies, aid: p.aid_provider, aidnum: p.aid_number, aidplan: p.aid_plan,
+    ph: p.phone, wa: p.whatsapp, em: p.email, addr: p.address, emer: p.emergency };
+}
+function normRecord(r) {
+  return { ...r, date: r.visit_date, diag: r.diagnosis, icd: r.icd10, vit: r.vitals, meds: r.medication, fu: r.follow_up, ref: r.referral };
+}
+function normSick(d) {
+  return { ...d, date: d.issue_date, diag: d.diagnosis, icd: d.icd10, from: d.rest_from, to: d.rest_to, inst: d.instructions,
+    patient_name: ST.patient ? ST.patient.fn + ' ' + ST.patient.ln : '' };
+}
+function normRx(d) {
+  return { ...d, date: d.script_date, diag: d.diagnosis, patient_name: ST.patient ? ST.patient.fn + ' ' + ST.patient.ln : '' };
+}
+function drLabel(name) { return 'Dr. ' + (name || '').replace(/^Dr\.?\s+/i, ''); }
+
+async function ensureProfile(user) {
+  const { data: acct } = await sb.from('patient_accounts').select('patient_id').eq('auth_id', user.id).maybeSingle();
+  if (acct) return acct;
+  // Self-service profile: names come from sign-up. The server insists the email is verified.
+  const md = user.user_metadata || {};
+  if (!md.first_name || !md.last_name) return null;
+  const { error } = await sb.rpc('create_my_profile', { p_first: md.first_name, p_last: md.last_name });
+  if (error) { toast(error.message, 'error'); return null; }
+  const { data: a2 } = await sb.from('patient_accounts').select('patient_id').eq('auth_id', user.id).maybeSingle();
+  return a2;
+}
+
+async function loadAccess() {
+  const { data } = await sb.rpc('list_my_access');
+  ST.access = data || [];
+  const live = ST.access.find(a => a.access_status === 'approved');
+  bkDoctorId = live ? live.dr_id : null;
+}
+
 async function loadPatient(user) {
   ST.user = user;
   await redeemPendingInvite();
-  const { data: acct } = await sb.from('patient_accounts').select('patient_id').eq('auth_id', user.id).single();
+  const acct = await ensureProfile(user);
   if (!acct) return;
   ST.account = acct;
-  const { data: pat } = await sb.from('patients').select('*').eq('id', acct.patient_id).single();
-  ST.patient = pat;
-  if (pat?.doctor_id) {
-    bkDoctorId = pat.doctor_id;
-    const { data: dr } = await sb.from('doctors').select('fn, ln, spec').eq('id', pat.doctor_id).single();
-    ST.doctor = dr || null;
+  // A doctor's request link: attach it to this profile (it still needs the patient's approval).
+  let tok = null;
+  try { tok = sessionStorage.getItem('mc_access_token'); } catch (e) {}
+  if (tok) {
+    const { error } = await sb.rpc('accept_access_link', { p_token: tok });
+    if (error) toast(error.message, 'error');
+    try { sessionStorage.removeItem('mc_access_token'); } catch (e) {}
   }
+  const { data: pat } = await sb.from('patients').select('*').eq('id', acct.patient_id).single();
+  ST.patient = normPatient(pat);
+  await loadAccess();
 }
 
 // ── TABS ─────────────────────────────────────────────
@@ -756,7 +810,18 @@ function renderHome() {
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const mons = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('home-date').textContent = `${days[now.getDay()]}, ${now.getDate()} ${mons[now.getMonth()]} ${now.getFullYear()}`;
+  renderAccessBanner();
   loadNextAppt();
+}
+
+function renderAccessBanner() {
+  const el = document.getElementById('access-banner');
+  const pend = (ST.access || []).filter(a => a.access_status === 'pending');
+  if (!pend.length) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="card" style="margin-bottom:12px;cursor:pointer;border-left:4px solid var(--azure)" onclick="switchTab('profile')">
+    <div style="font-size:14px;font-weight:700;color:var(--ink)">${pend.length === 1 ? 'A doctor is asking to see your records' : pend.length + ' doctors are asking to see your records'}</div>
+    <div style="font-size:12px;color:var(--ink2);margin-top:4px">Tap to review. Nobody sees anything until you approve.</div>
+  </div>`;
 }
 
 async function loadNextAppt() {
@@ -764,14 +829,14 @@ async function loadNextAppt() {
   if (!ST.account) { wrap.innerHTML = noApptCard(); return; }
   const today = isoDate(new Date());
   const { data } = await sb.from('appointments')
-    .select('*, doctors(fn, ln, spec)')
+    .select('*, doctors(first_name, last_name, spec)')
     .eq('patient_id', ST.account.patient_id)
     .gte('appt_date', today)
     .in('status', ['Confirmed','Pending'])
     .order('appt_date').order('appt_time').limit(1);
   if (!data || !data.length) { wrap.innerHTML = noApptCard(); return; }
   const a = data[0];
-  const dr = a.doctors ? `Dr. ${a.doctors.fn} ${a.doctors.ln}` : 'Your Doctor';
+  const dr = apptDoctor(a).name;
   wrap.innerHTML = `<div class="next-card" onclick="switchTab('appointments')">
     <div class="next-card-eyebrow">Next Appointment</div>
     <div class="next-card-doctor">${esc(dr)}</div>
@@ -795,7 +860,7 @@ async function loadAppointments() {
   el.innerHTML = spinner();
   const today = isoDate(new Date());
   const { data } = await sb.from('appointments')
-    .select('*, doctors(fn, ln, spec)')
+    .select('*, doctors(first_name, last_name, spec)')
     .eq('patient_id', ST.account.patient_id)
     .order('appt_date', { ascending: false })
     .order('appt_time', { ascending: false });
@@ -812,9 +877,16 @@ async function loadAppointments() {
   el.innerHTML = html || empty('calendar_today','No appointments yet','Use the button above to book');
 }
 
+function apptDoctor(a) {
+  if (a.doctors) return { name: `Dr. ${a.doctors.first_name} ${a.doctors.last_name}`, spec: a.doctors.spec || '' };
+  const g = (ST.access || []).find(x => x.dr_id === a.doctor_id);
+  return g ? { name: drLabel(g.dr_name), spec: g.dr_spec || '' } : { name: 'Doctor', spec: '' };
+}
+
 function apptCard(a, past=false) {
-  const dr   = a.doctors ? `Dr. ${esc(a.doctors.fn)} ${esc(a.doctors.ln)}` : 'Doctor';
-  const spec = a.doctors ? esc(a.doctors.spec) : '';
+  const d    = apptDoctor(a);
+  const dr   = esc(d.name);
+  const spec = esc(d.spec);
   const cls  = past ? 'past' : a.status === 'Cancelled' ? 'cancelled' : a.status === 'Completed' ? 'completed' : '';
   const badgeCls = { Confirmed:'badge-confirmed', Pending:'badge-pending', Cancelled:'badge-cancelled', Completed:'badge-completed', 'No Show':'badge-cancelled' }[a.status] || '';
   return `<div class="appt-card ${cls}">
@@ -870,7 +942,7 @@ function renderBookStep() {
 async function goStep2() {
   bkDate = document.getElementById('bk-date').value;
   if (!bkDate) { toast('Please pick a date', 'error'); return; }
-  if (!bkDoctorId) { toast('No doctor linked to your account yet', 'error'); return; }
+  if (!bkDoctorId) { toast('You can book once a doctor has your approved access', 'error'); return; }
   bkStep = 2; renderBookStep();
 }
 
@@ -924,10 +996,11 @@ async function loadRecords() {
   const el = document.getElementById('records-body');
   if (!ST.account) { el.innerHTML = empty('assignment','No records','Your doctor will add records after consultations'); return; }
   el.innerHTML = spinner();
-  const { data } = await sb.from('records')
+  const { data: raw } = await sb.from('records')
     .select('*')
     .eq('patient_id', ST.account.patient_id)
-    .order('date', { ascending: false });
+    .order('visit_date', { ascending: false });
+  const data = (raw || []).map(normRecord);
   if (!data || !data.length) {
     el.innerHTML = empty('assignment','No medical records yet','Your doctor will add records after your consultations');
     return;
@@ -959,10 +1032,11 @@ async function loadDocuments() {
   const pid = ST.account.patient_id;
   document.getElementById('docs-sn').innerHTML = spinner();
   document.getElementById('docs-rx').innerHTML = spinner();
-  const [{ data: sns }, { data: rxs }] = await Promise.all([
-    sb.from('sick_notes').select('*').eq('patient_id', pid).order('date', { ascending: false }),
-    sb.from('prescriptions').select('*').eq('patient_id', pid).order('date', { ascending: false }),
+  const [{ data: snRaw }, { data: rxRaw }] = await Promise.all([
+    sb.from('sick_notes').select('*').eq('patient_id', pid).order('issue_date', { ascending: false }),
+    sb.from('prescriptions').select('*').eq('patient_id', pid).order('script_date', { ascending: false }),
   ]);
+  const sns = (snRaw || []).map(normSick), rxs = (rxRaw || []).map(normRx);
   document.getElementById('docs-sn').innerHTML =
     (sns && sns.length) ? sns.map(d => docCard(d, 'sick_note')).join('') :
     empty('description','No sick notes','Sick notes from your doctor will appear here');
@@ -988,7 +1062,7 @@ async function viewDoc(type, id) {
   const { data } = await sb.from(tbl).select('*').eq('id', id).single();
   if (!data) { toast('Document not found', 'error'); return; }
   const w = window.open('', '_blank');
-  w.document.write(type === 'sick_note' ? buildSickNote(data) : buildPrescription(data));
+  w.document.write(type === 'sick_note' ? buildSickNote(normSick(data)) : buildPrescription(normRx(data)));
   w.document.close();
 }
 
@@ -1044,14 +1118,7 @@ function buildPrescription(d) {
 async function renderProfile() {
   const el  = document.getElementById('profile-body');
   const pat = ST.patient;
-  if (!pat) { el.innerHTML = empty('person','Profile not found','Contact your doctor to link your account'); return; }
-
-  // Fetch doctor if linked but not yet cached or potentially changed
-  if (pat.doctor_id && !ST.doctor) {
-    const { data } = await sb.from('doctors').select('fn, ln, spec').eq('id', pat.doctor_id).single();
-    ST.doctor = data || null;
-  }
-  const dr = pat.doctor_id ? ST.doctor : null;
+  if (!pat) { el.innerHTML = empty('person','Profile not found','Sign in again to finish setting up your profile'); return; }
 
   const ini = `${(pat.fn||'?')[0]}${(pat.ln||'?')[0]}`.toUpperCase();
   el.innerHTML = `
@@ -1063,20 +1130,8 @@ async function renderProfile() {
       </div>
     </div>
     <div class="info-block">
-      <div class="info-title">My Doctor</div>
-      ${dr
-        ? `<div class="info-row" style="align-items:center">
-            <div style="flex:1">
-              <div style="font-size:14px;font-weight:600;color:var(--ink)">Dr. ${esc(dr.fn)} ${esc(dr.ln)}</div>
-              ${dr.spec ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(dr.spec)}</div>` : ''}
-            </div>
-            <button onclick="openLinkDoctor()" class="doc-view-btn">Change</button>
-          </div>`
-        : `<div class="info-row" style="align-items:center">
-            <div style="flex:1;font-size:13px;color:var(--ink2)">No doctor linked yet</div>
-            <button onclick="openLinkDoctor()" class="doc-view-btn" style="background:var(--azure);color:#fff">+ Link Doctor</button>
-          </div>`
-      }
+      <div class="info-title">Doctors &amp; access</div>
+      <div id="access-list">${accessListHtml()}</div>
     </div>
     <div class="info-block">
       <div class="info-title">Personal Details</div>
@@ -1112,105 +1167,43 @@ function infoRow(k, v) {
   return `<div class="info-row"><div class="info-key">${k}</div><div class="info-val">${esc(String(v))}</div></div>`;
 }
 
-// ── LINK DOCTOR ───────────────────────────────────────
-function openLinkDoctor() {
-  renderLinkDoctorSheet();
-  document.getElementById('link-doctor-overlay').classList.add('open');
-}
-function closeLinkDoctor() {
-  document.getElementById('link-doctor-overlay').classList.remove('open');
-}
-function linkDrOverlayTap(e) {
-  if (e.target === document.getElementById('link-doctor-overlay')) closeLinkDoctor();
-}
-
-function renderLinkDoctorSheet() {
-  document.getElementById('link-doctor-body').innerHTML = `
-    <div class="sheet-title">Authorise a Doctor</div>
-    <div class="sheet-sub">Search for your doctor to grant them access to your records</div>
-    <div class="field" style="margin-top:4px">
-      <label>Search by name</label>
-      <input type="text" id="dr-search" placeholder="e.g. Mokoena, Smith…"
-             oninput="debouncedDrSearch()" autocomplete="off">
-    </div>
-    <div id="dr-results" style="min-height:60px">
-      <div style="font-size:13px;color:var(--ink3);padding:4px 0">Start typing to find your doctor</div>
-    </div>
-    <button class="btn-ghost" style="margin-top:16px" onclick="closeLinkDoctor()">Cancel</button>`;
-  setTimeout(() => document.getElementById('dr-search')?.focus(), 80);
-}
-
-function debouncedDrSearch() {
-  clearTimeout(drSearchTimer);
-  drSearchTimer = setTimeout(async () => {
-    const q   = (document.getElementById('dr-search')?.value || '').trim();
-    const el  = document.getElementById('dr-results');
-    if (!el) return;
-    if (q.length < 2) {
-      el.innerHTML = '<div style="font-size:13px;color:var(--ink3);padding:4px 0">Type at least 2 characters</div>';
-      return;
-    }
-    el.innerHTML = spinner();
-    const { data, error } = await sb.from('doctors')
-      .select('id, fn, ln, spec')
-      .or(`fn.ilike.%${q}%,ln.ilike.%${q}%`)
-      .limit(8);
-    if (error || !data || !data.length) {
-      el.innerHTML = `<div style="font-size:13px;color:var(--ink2);padding:4px 0">No doctors found for "<strong>${esc(q)}</strong>"</div>`;
-      drResults = [];
-      return;
-    }
-    drResults = data;
-    el.innerHTML = data.map((d, i) => `
-      <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:600;color:var(--ink)">Dr. ${esc(d.fn)} ${esc(d.ln)}</div>
-          ${d.spec ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc(d.spec)}</div>` : ''}
-        </div>
-        <button class="doc-view-btn" onclick="showDrConfirm(${i})">Select</button>
-      </div>`).join('');
-  }, 380);
-}
-
-function showDrConfirm(i) {
-  selectedDr = drResults[i];
-  if (!selectedDr) return;
-  const d = selectedDr;
-  document.getElementById('link-doctor-body').innerHTML = `
-    <div class="sheet-title">Confirm Authorisation</div>
-    <div class="sheet-sub">This doctor will be able to view and manage your medical records</div>
-    <div class="card" style="margin:20px 0;display:flex;align-items:center;gap:14px">
-      <div style="width:48px;height:48px;border-radius:50%;background:var(--azure);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0">${esc((d.fn||'D')[0])}${esc((d.ln||'')[0])}</div>
-      <div>
-        <div style="font-size:16px;font-weight:700;color:var(--ink)">Dr. ${esc(d.fn)} ${esc(d.ln)}</div>
-        ${d.spec ? `<div style="font-size:12px;color:var(--ink2);margin-top:3px">${esc(d.spec)}</div>` : ''}
-      </div>
-    </div>
-    <p style="font-size:13px;color:var(--ink2);line-height:1.65;margin-bottom:20px">
-      By confirming, you authorise Dr. ${esc(d.fn)} ${esc(d.ln)} to view your medical records,
-      add consultation notes, and manage your appointments on MedConsult.
-    </p>
-    <button class="btn-primary" id="confirm-link-btn" onclick="confirmLinkDoctor()">Confirm &amp; Authorise</button>
-    <button class="btn-ghost" style="margin-top:10px" onclick="renderLinkDoctorSheet()">← Back to search</button>`;
-}
-
-async function confirmLinkDoctor() {
-  if (!selectedDr) return;
-  setBtn('confirm-link-btn', 'Authorising…', true);
-  const { error } = await sb.from('patients')
-    .update({ doctor_id: selectedDr.id })
-    .eq('id', ST.account.patient_id);
-  if (error) {
-    setBtn('confirm-link-btn', 'Confirm & Authorise', false);
-    toast(error.message, 'error');
-    return;
+// ── DOCTORS & ACCESS ─────────────────────────────────
+function accessListHtml() {
+  const rows = (ST.access || []).filter(a => ['pending', 'approved'].includes(a.access_status));
+  if (!rows.length) {
+    return `<div class="info-row"><div style="font-size:13px;color:var(--ink2);line-height:1.6">No doctor can see your records. When a doctor asks for access, you will see the request here and decide.</div></div>`;
   }
-  ST.patient.doctor_id = selectedDr.id;
-  ST.doctor = { fn: selectedDr.fn, ln: selectedDr.ln, spec: selectedDr.spec };
-  bkDoctorId = selectedDr.id;
-  closeLinkDoctor();
-  toast(`Dr. ${selectedDr.fn} ${selectedDr.ln} authorised`, 'success');
-  renderProfile();
+  return rows.map(a => {
+    const who = esc(drLabel(a.dr_name));
+    const sub = [a.dr_spec, a.practice_name, a.dr_hpcsa ? 'HPCSA ' + a.dr_hpcsa : ''].filter(Boolean).map(esc).join(' · ');
+    const pending = a.access_status === 'pending';
+    return `<div class="info-row" style="align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:14px;font-weight:600;color:var(--ink)">${who}</div>
+        ${sub ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${sub}</div>` : ''}
+        <div style="font-size:12px;color:var(--ink3);margin-top:2px">${pending ? 'Asked ' + fmtDate(a.requested_at) + ' · wants to view and add to your records' : 'Has access to your full record'}</div>
+      </div>
+      ${pending
+        ? `<button class="doc-view-btn" style="background:var(--azure);color:#fff" onclick="respondAccess('${a.access_id}', true)">Approve</button>
+           <button class="doc-view-btn" onclick="respondAccess('${a.access_id}', false)">Decline</button>`
+        : `<button class="doc-view-btn" onclick="revokeAccess('${a.access_id}')">Revoke</button>`}
+    </div>`;
+  }).join('');
+}
+
+async function respondAccess(id, approve) {
+  const { error } = await sb.rpc('respond_access_request', { p_id: id, p_approve: approve });
+  if (error) { toast(error.message, 'error'); return; }
+  toast(approve ? 'Access approved' : 'Request declined', 'success');
+  await loadAccess(); renderAccessBanner(); renderProfile();
+}
+
+async function revokeAccess(id) {
+  if (!confirm('Revoke access? This doctor will no longer be able to see your records.')) return;
+  const { error } = await sb.rpc('revoke_access', { p_id: id });
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Access revoked', 'success');
+  await loadAccess(); renderAccessBanner(); renderProfile();
 }
 
 // ── HELPERS ──────────────────────────────────────────

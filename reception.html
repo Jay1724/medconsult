@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="medical-aid.js"></script>
+<script src="patient-access.js"></script>
 <style>
 /* ── TOKENS ─────────────────────────────────────────────── */
 :root {
@@ -450,7 +451,11 @@ tr:hover td{background:var(--grey-50)}
             <h1>Patients</h1>
             <p>Register new patients — patient details are only accessible to clinical staff</p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="openNewPatient()" style="flex-shrink:0;margin-top:4px">+ New Patient</button>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;flex-shrink:0;margin-top:4px">
+            <button class="btn btn-secondary btn-sm" onclick="PatientAccess.openRequests()">Access requests</button>
+            <button class="btn btn-secondary btn-sm" onclick="PatientAccess.open()">Invite patient</button>
+            <button class="btn btn-primary btn-sm" onclick="openNewPatient()">+ New Patient</button>
+          </div>
         </div>
         <div class="search-bar">
           <span class="search-icon">🔍</span>
@@ -658,6 +663,8 @@ tr:hover td{background:var(--grey-50)}
 const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Invite patients / request access. Reception picks the doctor the request is for.
+PatientAccess.init({ sb, getDoctors: () => (R.doctors || []).map(d => ({ id: d.id, name: 'Dr. ' + d.first_name + ' ' + d.last_name })) });
 
 /* ── STATE ─────────────────────────────────────────────────── */
 const R = { user: null, member: null, practice: null, doctors: [], patients: [], todayAppts: [] };
