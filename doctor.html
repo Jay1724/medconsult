@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="medical-aid.js"></script>
+<script src="patient-access.js"></script>
 <style>
 /* ── DESIGN TOKENS ──────────────────────────────────────── */
 :root {
@@ -867,7 +868,11 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
     <div class="page" id="pg-patients">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
         <div style="font-size:13px;color:var(--ink2)"><span id="pc-count">0</span> patients registered</div>
-        <button class="btn btn-primary" onclick="showAddPatient()">+ Add Patient</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-ghost" onclick="PatientAccess.openRequests()">Access requests</button>
+          <button class="btn btn-ghost" onclick="PatientAccess.open()">Invite patient</button>
+          <button class="btn btn-primary" onclick="showAddPatient()">+ Add Patient</button>
+        </div>
       </div>
       <div class="card">
         <div class="card-header"><div class="card-title">Patient Registry</div><div class="searchbar" style="width:190px"><span style="color:var(--grey-300)">⌕</span><input placeholder="Filter…" oninput="filterPats(this.value)"></div></div>
@@ -1248,6 +1253,8 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
 const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// Invite patients / request access. A doctor sends requests for themselves.
+PatientAccess.init({ sb: sbClient });
 
 // ══════════════════════════════════════════════════
 //  APP STATE
