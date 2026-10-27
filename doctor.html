@@ -1708,6 +1708,7 @@ async function savePat(){
 // ══════════════════════════════════════════════════
 function openDetail(id){
   const p=gp(id); curPID=id;
+  sbClient.rpc('log_view',{p_patient:id}).then(()=>{},()=>{});   // access log: who opened this file
   document.getElementById('d-av').style.background=p.col;
   document.getElementById('d-av').style.borderRadius='12px';
   document.getElementById('d-av').textContent=ini(p);
@@ -1744,7 +1745,7 @@ async function saveRec(){
   if(error){toast(error.message,'error');return}
   S.records.push(fromRec(data));closeM('m-record');toast('Record saved','success');loadRecords(pid);
 }
-function loadRecords(pid){const el=document.getElementById('rec-display');if(!pid){el.innerHTML='';return}const recs=S.records.filter(r=>r.pid===pid);const p=gp(pid);el.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">Records — ${fn(p)}</div><button class="btn btn-primary btn-sm" onclick="showAddRecord('${pid}')">+ Add</button></div><div style="padding:16px">${recs.length?recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="rec-item"><div class="rec-date">${r.date} · ${r.type}</div><div class="rec-title">${r.diag} <span class="pill pill-blue" style="font-size:10px">${r.icd}</span></div>${r.vit?`<div style="font-size:11px;color:var(--ink2);margin-bottom:4px;font-family:'JetBrains Mono',monospace">Vitals: ${r.vit}</div>`:''}<div class="rec-notes">${r.notes}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records for this patient</div>'}</div></div>`;}
+function loadRecords(pid){const el=document.getElementById('rec-display');if(!pid){el.innerHTML='';return}sbClient.rpc('log_view',{p_patient:pid}).then(()=>{},()=>{});const recs=S.records.filter(r=>r.pid===pid);const p=gp(pid);el.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">Records — ${fn(p)}</div><button class="btn btn-primary btn-sm" onclick="showAddRecord('${pid}')">+ Add</button></div><div style="padding:16px">${recs.length?recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="rec-item"><div class="rec-date">${r.date} · ${r.type}</div><div class="rec-title">${r.diag} <span class="pill pill-blue" style="font-size:10px">${r.icd}</span></div>${r.vit?`<div style="font-size:11px;color:var(--ink2);margin-bottom:4px;font-family:'JetBrains Mono',monospace">Vitals: ${r.vit}</div>`:''}<div class="rec-notes">${r.notes}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records for this patient</div>'}</div></div>`;}
 
 // ══════════════════════════════════════════════════
 //  SIGNATURE CANVASES
