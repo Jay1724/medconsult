@@ -1260,7 +1260,7 @@ PatientAccess.init({ sb: sbClient });
 //  APP STATE
 // ══════════════════════════════════════════════════
 const S = {
-  doc: null, plan: 'pro',
+  doc: null, docId: null, plan: 'pro',
   patients: [], records: [], invoices: [], claims: [], sickNotes: [], scripts: [],
   iNum: 1001, cNum: 5001,
   snRef: 2400, rxRef: 3300,
@@ -1272,26 +1272,48 @@ let sigCtx = {sn: null, rx: null};
 let sigDrawing = {sn: false, rx: false};
 let sigHasContent = {sn: false, rx: false};
 
-// ── SEED DATA ──────────────────────────────────
-function seed() {
-  S.patients = [
-    {id:'p1',fn:'Thabo',ln:'Mokoena',dob:'1985-03-15',idnum:'8503155009087',gen:'Male',bl:'O+',ph:'+27 71 234 5678',wa:'+27 71 234 5678',em:'thabo.mokoena@email.com',addr:'12 Oak Street, Johannesburg, 2001',aid:'Discovery Health Medical Scheme',aidnum:'8004512396',aidstatus:'verified',aidplan:'Classic Delta',principal:'',allerg:'Penicillin',chronic:'Hypertension',emer:'Nomsa Mokoena +27 82 987 6543',col:'#2563eb'},
-    {id:'p2',fn:'Sarah',ln:'van der Berg',dob:'1992-07-22',idnum:'9207225009087',gen:'Female',bl:'A+',ph:'+27 82 345 6789',wa:'+27 82 345 6789',em:'sarah.vdb@email.com',addr:'45 Protea Ave, Cape Town, 8001',aid:'Momentum Medical Scheme',aidnum:'MH789012',aidstatus:'unverified',aidplan:'Ingwe',principal:'',allerg:'None known',chronic:'Asthma',emer:'John van der Berg +27 83 111 2222',col:'#7c3aed'},
-    {id:'p3',fn:'Mohammed',ln:'Hassan',dob:'1978-11-08',idnum:'7811085009087',gen:'Male',bl:'B+',ph:'+27 83 456 7890',wa:'+27 83 456 7890',em:'m.hassan@email.com',addr:'88 Berea Road, Durban, 4001',aid:'Bonitas Medical Fund',aidnum:'34567891',aidstatus:'unverified',aidplan:'BonCap',principal:'',allerg:'Sulfa drugs',chronic:'Diabetes Type 2',emer:'Fatima Hassan +27 84 333 4444',col:'#d97706'},
-    {id:'p4',fn:'Liesel',ln:'Pretorius',dob:'2001-02-14',idnum:'0102145009087',gen:'Female',bl:'AB-',ph:'+27 73 567 8901',wa:'+27 73 567 8901',em:'liesel.p@email.com',addr:'3 Jacaranda Lane, Pretoria, 0001',aid:'',aidnum:'',aidplan:'',principal:'',allerg:'Latex',chronic:'None',emer:'Pieter Pretorius +27 82 555 6666',col:'#be185d'},
-  ];
-  S.records = [
-    {id:'r1',pid:'p1',date:'2026-04-10',type:'In-Person',diag:'Hypertension Follow-Up',icd:'I10',vit:'145/90, HR 78',notes:'BP slightly elevated. Adjusted Amlodipine to 10mg. Advised diet and exercise.',meds:'Amlodipine 10mg OD',fu:'2026-05-10',ref:''},
-    {id:'r2',pid:'p2',date:'2026-04-15',type:'Video Call (WhatsApp)',diag:'Acute Asthma Exacerbation',icd:'J45.1',vit:'HR 94, SpO2 94%',notes:'Increased wheeze and dyspnoea. Salbutamol nebulisation prescribed. Advised to go to ER if not improving.',meds:'Salbutamol 100mcg inhaler, Prednisone 30mg OD x 5d',fu:'2026-04-19',ref:'Pulmonologist'},
-  ];
-  S.invoices = [
-    {id:'inv-1001',num:'INV-1001',pid:'p1',date:'2026-04-10',due:'2026-04-25',lines:[{d:'General Consultation',q:1,r:700},{d:'BP Monitoring',q:1,r:150}],notes:'EFT: FNB Acc 62123456. Ref: Mokoena',status:'Paid'},
-    {id:'inv-1002',num:'INV-1002',pid:'p2',date:'2026-04-15',due:'2026-04-30',lines:[{d:'Telehealth Consultation',q:1,r:600},{d:'Spirometry',q:1,r:350}],notes:'',status:'Pending'},
-  ];
-  S.claims = [{id:'cl-5001',ref:'CLM-5001',pid:'p1',aidProv:'Discovery Health Medical Scheme',aidnum:'8004512396',dtSvc:'2026-04-10',icd:'I10',tariff:'0190',svc:'General Consultation',amt:700,notes:'',status:'Submitted',subDate:'2026-04-10'}];
-  S.sickNotes = [{id:'sn1',ref:'SN-2400',pid:'p2',date:'2026-04-15',from:'2026-04-15',to:'2026-04-19',diag:'Acute Asthma Exacerbation',icd:'J45.1',inst:'Bed rest, adequate fluids, avoid cold air and smoke.',sigImg:''}];
-  S.scripts = [{id:'rx1',ref:'RX-3300',pid:'p1',date:'2026-04-10',diag:'Hypertension',rep:'3',meds:[{name:'Amlodipine',str:'10mg',dose:'Once daily in the morning',qty:'30 tablets',inst:'Take with or without food'}],sigImg:''}];
-  S.snRef = 2401; S.rxRef = 3301;
+// ── LIVE DATA ──────────────────────────────────
+// Patients, records, sick notes and prescriptions are read from and written to Supabase.
+// Row access is decided by the database: your own patients, plus any patient who approved you.
+// Invoices and claims have no database tables yet, so they stay in memory for this session only.
+const fromPat = p => ({ id:p.id, fn:p.first_name, ln:p.last_name, dob:p.dob||'', idnum:p.id_number||'', gen:p.gender||'', bl:p.blood_type||'',
+  ph:p.phone||'', wa:p.whatsapp||'', em:p.email||'', addr:p.address||'', aid:p.aid_provider||'', aidnum:p.aid_number||'', aidplan:p.aid_plan||'',
+  aidstatus:p.aid_status||undefined, principal:p.principal||'', allerg:p.allergies||'', chronic:p.chronic||'', emer:p.emergency||'',
+  col:p.color||'#2563eb', own:p.doctor_id===S.docId });
+const toPat = d => ({ first_name:d.fn, last_name:d.ln, dob:d.dob||null, id_number:d.idnum||null, gender:d.gen||null, blood_type:d.bl||null,
+  phone:d.ph||null, whatsapp:d.wa||null, email:d.em||null, address:d.addr||null, aid_provider:d.aid||null, aid_number:d.aidnum||null,
+  aid_plan:d.aidplan||null, aid_status:d.aid?(d.aidstatus||'unverified'):null, principal:d.principal||null, allergies:d.allerg||null,
+  chronic:d.chronic||null, emergency:d.emer||null, color:d.col });
+const fromRec = r => ({ id:r.id, pid:r.patient_id, date:r.visit_date, type:r.visit_type||'In-Person', diag:r.diagnosis, icd:r.icd10||'', vit:r.vitals||'',
+  notes:r.notes||'', meds:r.medication||'', fu:r.follow_up||'', ref:r.referral||'' });
+const toRec = r => ({ patient_id:r.pid, visit_date:r.date, visit_type:r.type, diagnosis:r.diag, icd10:r.icd||null, vitals:r.vit||null, notes:r.notes||null,
+  medication:r.meds||null, follow_up:r.fu||null, referral:r.ref||null });
+const fromSN = n => ({ id:n.id, ref:n.ref_number, pid:n.patient_id, date:n.issue_date, from:n.rest_from||'', to:n.rest_to||'', diag:n.diagnosis,
+  icd:n.icd10||'', inst:n.instructions||'', sigImg:n.sig_image||'' });
+const fromRX = x => ({ id:x.id, ref:x.ref_number, pid:x.patient_id, date:x.script_date, diag:x.diagnosis||'', rep:String(x.repeats||'0'),
+  meds:Array.isArray(x.medications)?x.medications:[], sigImg:x.sig_image||'' });
+const refNum = list => list.reduce((m,x)=>Math.max(m, parseInt(String(x.ref).replace(/\D/g,''),10)||0), 0);
+
+async function loadLive() {
+  const { data:{ user } } = await sbClient.auth.getUser();
+  if (!user) return;
+  const { data:me } = await sbClient.from('doctors').select('id').eq('auth_id', user.id).order('created_at').limit(1).maybeSingle();
+  S.docId = me ? me.id : null;
+  const [p, r, sn, rx] = await Promise.all([
+    sbClient.from('patients').select('*').order('last_name'),
+    sbClient.from('records').select('*').order('visit_date', { ascending:false }),
+    sbClient.from('sick_notes').select('*').order('issue_date', { ascending:false }),
+    sbClient.from('prescriptions').select('*').order('script_date', { ascending:false }),
+  ]);
+  const bad = [p, r, sn, rx].find(x => x.error);
+  if (bad) toast('Could not load some data: ' + bad.error.message, 'error');
+  S.patients  = (p.data  || []).map(fromPat);
+  S.records   = (r.data  || []).map(fromRec);
+  S.sickNotes = (sn.data || []).map(fromSN);
+  S.scripts   = (rx.data || []).map(fromRX);
+  S.snRef = Math.max(2400, refNum(S.sickNotes)) + 1;
+  S.rxRef = Math.max(3300, refNum(S.scripts)) + 1;
+  popSelects(); renderDash(); renderPats(); await loadToday();
 }
 
 // ══════════════════════════════════════════════════
@@ -1431,7 +1453,7 @@ function launchApp() {
   document.getElementById('sb-plan').textContent=planBadge();
   const h=new Date().getHours();const greeting=h<12?'Good morning':h<17?'Good afternoon':'Good evening';
   document.getElementById('pg-title').textContent=`${greeting}, ${d.fn}`;
-  popSelects(); renderDash(); initSigs(); renderSub(); loadReception();
+  popSelects(); renderDash(); initSigs(); renderSub(); loadReception(); loadLive();
 }
 
 async function doLogout() {
@@ -1568,13 +1590,25 @@ function popSelects(){
 // ══════════════════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════════════════
+// Today's confirmed/pending appointments for this doctor, joined to the patients we can see.
+function apptKind(a){return /video|phone|tele/i.test(a.type||'')?'video':'inperson'}
+function schedHtml(list){
+  if(!list.length)return '<div style="text-align:center;padding:24px;color:var(--ink2)">No appointments today</div>';
+  return list.map(a=>{const p=gp(a.patient_id),k=apptKind(a),name=p?fn(p):'Patient',click=p?`onclick="openDetail('${p.id}')"`:'';
+    return `<div class="appt-row" ${click}><div class="appt-time">${String(a.appt_time).slice(0,5)}</div><div class="appt-dot" style="background:${k==='video'?'var(--azure)':'var(--success)'}"></div><div class="appt-info"><div class="appt-name">${name}</div><div class="appt-type">${a.type||'Consultation'}${a.reason?' · '+a.reason:''}</div></div><span class="pill ${k==='video'?'pill-blue':'pill-green'}" style="font-size:10px">${k==='video'?'📹 Video':'🏥 In-Person'}</span></div>`}).join('');
+}
+async function loadToday(){
+  if(!S.docId)return;
+  const {data}=await sbClient.from('appointments').select('patient_id,appt_time,type,reason,status').eq('doctor_id',S.docId).eq('appt_date',td()).in('status',['Confirmed','Pending']).order('appt_time');
+  S.todayAppts=data||[];
+  document.getElementById('d-schedule').innerHTML=schedHtml(S.todayAppts);
+}
 function renderDash(){
   document.getElementById('s-patients').textContent=S.patients.length;
   document.getElementById('s-invoices').textContent=S.invoices.filter(i=>i.status==='Pending').length;
   document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
   document.getElementById('d-date').textContent=new Date().toLocaleDateString('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-  const sched=[{t:'08:30',n:'Thabo Mokoena',s:'In-Person · Hypertension',pid:'p1',k:'inperson'},{t:'10:00',n:'Sarah van der Berg',s:'Video · Asthma Review',pid:'p2',k:'video'},{t:'11:30',n:'Mohammed Hassan',s:'In-Person · Diabetes',pid:'p3',k:'inperson'},{t:'14:00',n:'Liesel Pretorius',s:'Video · General Consult',pid:'p4',k:'video'}];
-  document.getElementById('d-schedule').innerHTML=sched.map(s=>`<div class="appt-row" onclick="openDetail('${s.pid}')"><div class="appt-time">${s.t}</div><div class="appt-dot" style="background:${s.k==='video'?'var(--azure)':'var(--success)'}"></div><div class="appt-info"><div class="appt-name">${s.n}</div><div class="appt-type">${s.s}</div></div><span class="pill ${s.k==='video'?'pill-blue':'pill-green'}" style="font-size:10px">${s.k==='video'?'📹 Video':'🏥 In-Person'}</span></div>`).join('');
+  document.getElementById('d-schedule').innerHTML=schedHtml(S.todayAppts||[]);
   document.getElementById('d-recent').innerHTML=S.patients.slice().reverse().slice(0,4).map(p=>`<div class="appt-row" onclick="openDetail('${p.id}')"><div class="mini-av" style="background:${p.col}">${ini(p)}</div><div class="appt-info"><div class="appt-name">${fn(p)}</div><div class="appt-type">${p.aid||'Private'} · ${p.chronic||'No chronic conditions'}</div></div></div>`).join('');
 }
 
@@ -1595,6 +1629,11 @@ function editPat(id){const p=gp(id);editPID=id;document.getElementById('m-patien
 function aidPill(p){const pi=MedicalAid.statusPill(p.aidstatus||'unverified');return `<span class="pill ${pi.cls}" style="cursor:pointer" title="Click to verify medical aid" onclick="event.stopPropagation();verifyAid('${p.id}')">${pi.label}</span>`;}
 function validatePAid(){const aid=document.getElementById('p-aid').value,num=document.getElementById('p-aidnum').value.trim(),err=document.getElementById('p-aidnum-err');if(!aid||!num){err.textContent='';return}const v=MedicalAid.validate(aid,num);err.textContent=v.status==='format_invalid'?v.message:'';}
 async function verifyAid(id){
+  await verifyAidInner(id);
+  const p=gp(id);
+  if(p&&p.own&&p.aidstatus)await sbClient.from('patients').update({aid_status:p.aidstatus}).eq('id',id);
+}
+async function verifyAidInner(id){
   const p=gp(id); if(!p||!p.aid) return;
   const v=MedicalAid.validate(p.aid,p.aidnum);
   if(v.status==='format_invalid'){p.aidstatus='invalid';toast(v.message,'error');renderPats();return}
@@ -1622,13 +1661,27 @@ function validatePId(autofill){
   hint.textContent=[v.message,...(v.warnings||[])].filter(Boolean).join(' ');
   return v;
 }
-function savePat(){
+async function savePat(){
   if(validatePId(false).status==='invalid'){toast('Please correct the SA ID number','error');return}
   const fn2=document.getElementById('p-fn').value.trim(),ln2=document.getElementById('p-ln').value.trim();
   if(!fn2||!ln2){toast('Enter first and last name','error');return}
   const d={fn:fn2,ln:ln2,dob:document.getElementById('p-dob').value,idnum:document.getElementById('p-id').value.trim(),gen:document.getElementById('p-gen').value,bl:document.getElementById('p-bl').value,ph:document.getElementById('p-ph').value.trim(),wa:document.getElementById('p-wa').value.trim()||document.getElementById('p-ph').value.trim(),em:document.getElementById('p-em').value.trim(),addr:document.getElementById('p-addr').value.trim(),aid:document.getElementById('p-aid').value,aidnum:document.getElementById('p-aidnum').value.trim(),aidplan:document.getElementById('p-aidplan').value.trim(),principal:document.getElementById('p-principal').value.trim(),allerg:document.getElementById('p-allerg').value.trim(),chronic:document.getElementById('p-chronic').value.trim(),emer:document.getElementById('p-emer').value.trim(),col:['#2563eb','#7c3aed','#d97706','#be185d','#0891b2','#16a34a'][Math.floor(Math.random()*6)]};
   if(d.aid){const v=MedicalAid.validate(d.aid,d.aidnum);if(v.status==='format_invalid'){toast(v.message,'error');return}}
-  if(editPID){const i=S.patients.findIndex(p=>p.id===editPID);const old=S.patients[i];d.aidstatus=d.aid?((old.aid===d.aid&&old.aidnum===d.aidnum)?(old.aidstatus||'unverified'):'unverified'):undefined;S.patients[i]={...old,...d};toast('Patient updated','success');}else{d.id='p'+Date.now();if(d.aid)d.aidstatus='unverified';S.patients.push(d);toast('Patient added','success');}
+  if(editPID){
+    const i=S.patients.findIndex(p=>p.id===editPID),old=S.patients[i];
+    if(!old.own){toast('This patient manages their own details. You can still add records.','error');return}
+    d.aidstatus=d.aid?((old.aid===d.aid&&old.aidnum===d.aidnum)?(old.aidstatus||'unverified'):'unverified'):undefined;
+    d.col=old.col;
+    const {error}=await sbClient.from('patients').update(toPat({...old,...d})).eq('id',editPID);
+    if(error){toast(error.message,'error');return}
+    S.patients[i]={...old,...d};toast('Patient updated','success');
+  }else{
+    if(!S.docId){toast('Your doctor profile is not set up yet','error');return}
+    if(d.aid)d.aidstatus='unverified';
+    const {data,error}=await sbClient.from('patients').insert({...toPat(d),doctor_id:S.docId}).select().single();
+    if(error){toast(error.message,'error');return}
+    S.patients.push(fromPat(data));toast('Patient added','success');
+  }
   closeM('m-patient');renderPats();popSelects();document.getElementById('s-patients').textContent=S.patients.length;
 }
 
@@ -1664,7 +1717,15 @@ function invForCur(){closeM('m-detail');showAddInvoice(curPID);}
 //  RECORDS
 // ══════════════════════════════════════════════════
 function showAddRecord(pre){popSelects();document.getElementById('r-date').value=td();['diag','icd','vit','notes','meds','ref'].forEach(f=>document.getElementById('r-'+f).value='');document.getElementById('r-fu').value='';if(pre)document.getElementById('r-pat').value=pre;openM('m-record');}
-function saveRec(){const pid=document.getElementById('r-pat').value,diag=document.getElementById('r-diag').value.trim();if(!pid||!diag){toast('Select patient and enter diagnosis','error');return}S.records.push({id:'r'+Date.now(),pid,date:document.getElementById('r-date').value,type:document.getElementById('r-type').value,diag,icd:document.getElementById('r-icd').value.trim(),vit:document.getElementById('r-vit').value.trim(),notes:document.getElementById('r-notes').value.trim(),meds:document.getElementById('r-meds').value.trim(),fu:document.getElementById('r-fu').value,ref:document.getElementById('r-ref').value.trim()});closeM('m-record');toast('Record saved','success');loadRecords(pid);}
+async function saveRec(){
+  const pid=document.getElementById('r-pat').value,diag=document.getElementById('r-diag').value.trim();
+  if(!pid||!diag){toast('Select patient and enter diagnosis','error');return}
+  if(!S.docId){toast('Your doctor profile is not set up yet','error');return}
+  const rec={pid,date:document.getElementById('r-date').value,type:document.getElementById('r-type').value,diag,icd:document.getElementById('r-icd').value.trim(),vit:document.getElementById('r-vit').value.trim(),notes:document.getElementById('r-notes').value.trim(),meds:document.getElementById('r-meds').value.trim(),fu:document.getElementById('r-fu').value,ref:document.getElementById('r-ref').value.trim()};
+  const {data,error}=await sbClient.from('records').insert({...toRec(rec),doctor_id:S.docId}).select().single();
+  if(error){toast(error.message,'error');return}
+  S.records.push(fromRec(data));closeM('m-record');toast('Record saved','success');loadRecords(pid);
+}
 function loadRecords(pid){const el=document.getElementById('rec-display');if(!pid){el.innerHTML='';return}const recs=S.records.filter(r=>r.pid===pid);const p=gp(pid);el.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">Records — ${fn(p)}</div><button class="btn btn-primary btn-sm" onclick="showAddRecord('${pid}')">+ Add</button></div><div style="padding:16px">${recs.length?recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="rec-item"><div class="rec-date">${r.date} · ${r.type}</div><div class="rec-title">${r.diag} <span class="pill pill-blue" style="font-size:10px">${r.icd}</span></div>${r.vit?`<div style="font-size:11px;color:var(--ink2);margin-bottom:4px;font-family:'JetBrains Mono',monospace">Vitals: ${r.vit}</div>`:''}<div class="rec-notes">${r.notes}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records for this patient</div>'}</div></div>`;}
 
 // ══════════════════════════════════════════════════
@@ -1742,11 +1803,15 @@ function snPrev(){
   const data={ref:'PREVIEW',patName:p?fn(p):'',patId:p?p.idnum:'',date:document.getElementById('sn-date').value,from:document.getElementById('sn-from').value,to:document.getElementById('sn-to').value,diag:document.getElementById('sn-diag').value,icd:document.getElementById('sn-icd').value,inst:document.getElementById('sn-inst').value,sigImg:getSig('sn')};
   document.getElementById('sn-preview').innerHTML=buildSNDoc(data);
 }
-function saveSN(){
+async function saveSN(){
   const pid=document.getElementById('sn-pat').value,diag=document.getElementById('sn-diag').value.trim();
   if(!pid||!diag){toast('Select patient and enter diagnosis','error');return}
   const ref='SN-'+S.snRef++;
-  S.sickNotes.push({id:'sn'+Date.now(),ref,pid,date:document.getElementById('sn-date').value,from:document.getElementById('sn-from').value,to:document.getElementById('sn-to').value,diag,icd:document.getElementById('sn-icd').value.trim(),inst:document.getElementById('sn-inst').value.trim(),sigImg:getSig('sn')});
+  if(!S.docId){toast('Your doctor profile is not set up yet','error');return}
+  const row={doctor_id:S.docId,patient_id:pid,ref_number:ref,issue_date:document.getElementById('sn-date').value,rest_from:document.getElementById('sn-from').value||null,rest_to:document.getElementById('sn-to').value||null,diagnosis:diag,icd10:document.getElementById('sn-icd').value.trim()||null,instructions:document.getElementById('sn-inst').value.trim()||null,sig_image:getSig('sn')||null};
+  const {data,error}=await sbClient.from('sick_notes').insert(row).select().single();
+  if(error){S.snRef--;toast(error.message,'error');return}
+  S.sickNotes.unshift(fromSN(data));
   closeM('m-sn');toast(ref+' issued','success');renderSNs();document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
 }
 function renderSNs(){
@@ -1821,11 +1886,15 @@ function rxPrev(){
   const data={ref:'PREVIEW',patName:p?fn(p):'',patDob:p?p.dob:'',patId:p?p.idnum:'',date:document.getElementById('rx-date').value,diag:document.getElementById('rx-diag').value,rep:document.getElementById('rx-rep').value,meds:rxMeds,sigImg:getSig('rx')};
   document.getElementById('rx-preview').innerHTML=buildRXDoc(data);
 }
-function saveRX(){
+async function saveRX(){
   const pid=document.getElementById('rx-pat').value;const meds=rxMeds.filter(m=>m.name.trim());
   if(!pid||!meds.length){toast('Select patient and add at least one medication','error');return}
   const ref='RX-'+S.rxRef++;
-  S.scripts.push({id:'rx'+Date.now(),ref,pid,date:document.getElementById('rx-date').value,diag:document.getElementById('rx-diag').value.trim(),rep:document.getElementById('rx-rep').value,meds,sigImg:getSig('rx')});
+  if(!S.docId){S.rxRef--;toast('Your doctor profile is not set up yet','error');return}
+  const row={doctor_id:S.docId,patient_id:pid,ref_number:ref,script_date:document.getElementById('rx-date').value,diagnosis:document.getElementById('rx-diag').value.trim()||null,repeats:document.getElementById('rx-rep').value,medications:meds,sig_image:getSig('rx')||null};
+  const {data,error}=await sbClient.from('prescriptions').insert(row).select().single();
+  if(error){S.rxRef--;toast(error.message,'error');return}
+  S.scripts.unshift(fromRX(data));
   closeM('m-rx');toast(ref+' prescription issued','success');renderRXs();document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
 }
 function renderRXs(){
@@ -1883,7 +1952,7 @@ function renderClaims(){
 // ══════════════════════════════════════════════════
 function renderConsult(){
   popSelects();
-  document.getElementById('c-upcoming').innerHTML=[{pid:'p1',t:'10:00'},{pid:'p2',t:'11:30'},{pid:'p4',t:'14:00'}].map(u=>{const p=gp(u.pid);return p?`<div class="upcoming-item"><div class="upcoming-time">${u.t}</div><div style="flex:1"><div class="upcoming-name">${fn(p)}</div><div class="upcoming-type">${p.wa||p.ph}</div></div><button class="btn btn-ghost btn-xs" onclick="launchCall('${p.id}')">Call</button></div>`:''}).join('');
+  document.getElementById('c-upcoming').innerHTML=(S.todayAppts||[]).filter(a=>apptKind(a)==='video'&&gp(a.patient_id)).map(a=>{const p=gp(a.patient_id);return`<div class="upcoming-item"><div class="upcoming-time">${String(a.appt_time).slice(0,5)}</div><div style="flex:1"><div class="upcoming-name">${fn(p)}</div><div class="upcoming-type">${p.wa||p.ph}</div></div><button class="btn btn-ghost btn-xs" onclick="launchCall('${p.id}')">Call</button></div>`}).join('')||'<div style="padding:16px;color:var(--ink2);font-size:13px">No video consultations booked today</div>';
 }
 function cUpdateNum(){const pid=document.getElementById('c-patient').value;if(pid){const p=gp(pid);document.getElementById('c-num').value=p.wa||p.ph;}}
 function startWACall(e){e.preventDefault();const num=document.getElementById('c-num').value.trim().replace(/\s+/g,'').replace(/^\+/,'');if(!num){toast('Enter a WhatsApp number','error');return}window.open(`https://wa.me/${num}?text=Hello%2C+this+is+${encodeURIComponent(S.doc.name)}.+Please+accept+my+WhatsApp+video+call+for+your+consultation.`,'_blank');document.getElementById('video-area').innerHTML=`<div style="text-align:center;color:rgba(255,255,255,.7)"><div style="font-size:48px;margin-bottom:12px">📱</div><div style="font-size:15px;font-weight:500">Opening WhatsApp</div><div style="font-size:12px;margin-top:4px;color:rgba(255,255,255,.4)">Video call launched in WhatsApp</div></div>`;}
@@ -2303,7 +2372,6 @@ async function saveAvailability() {
 document.addEventListener('DOMContentLoaded',()=>{
   const aidSel=document.getElementById('p-aid');
   MedicalAid.schemeNames().concat(['Other']).forEach(n=>{const o=document.createElement('option');o.textContent=n;aidSel.appendChild(o);});
-  seed();
   document.getElementById('r-date').value=td();
   // Auto-type sig after canvas init (deferred)
   setTimeout(()=>{if(sigCtx.sn&&S.doc)typeSig('sn');},200);
