@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="medical-aid.js"></script>
 <script src="patient-access.js"></script>
+<script src="staff-mfa.js"></script>
 <style>
 /* ── DESIGN TOKENS ──────────────────────────────────────── */
 :root {
@@ -812,6 +813,7 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
     <div class="topbar-right">
       <div class="searchbar"><span style="color:var(--grey-300)">⌕</span><input placeholder="Search patients…" oninput="globalSearch(this.value)"></div>
       <button class="btn btn-primary" onclick="showAddPatient()">+ New Patient</button>
+      <button class="btn btn-ghost btn-sm" onclick="StaffMFA.openSettings()" title="Two-factor sign-in">Two-factor</button>
       <button class="btn btn-ghost btn-sm" onclick="doLogout()">Log out</button>
     </div>
   </div>
@@ -1255,6 +1257,7 @@ const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // Invite patients / request access. A doctor sends requests for themselves.
+StaffMFA.init({ sb: sbClient });
 PatientAccess.init({ sb: sbClient, onOpenDoc: (kind, id) => {
   if (kind === 'sick_note') viewSN(id);
   else if (kind === 'prescription') viewRX(id);
@@ -1414,6 +1417,7 @@ async function doLogin() {
   const { data, error } = await sbClient.auth.signInWithPassword({ email: e, password: p });
   btn.textContent = 'Sign In →'; btn.disabled = false;
   if (error) { toast(error.message, 'error'); return; }
+  if (!(await StaffMFA.require())) return;   // authenticator code, if they have set one up
   S.doc = docFromMeta(data.user.user_metadata, e);
   S.plan = data.user.user_metadata.plan || 'pro';
   launchApp();
@@ -1550,6 +1554,7 @@ async function acceptDoctorInvite() {
   const hasInvite = await checkPracticeInvite();
   const { data: { session } } = await sbClient.auth.getSession();
   if (session) {
+    if (!(await StaffMFA.require())) return;
     const meta = session.user.user_metadata;
     S.doc = docFromMeta(meta, session.user.email);
     S.plan = meta.plan || 'pro';

@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="medical-aid.js"></script>
 <script src="patient-access.js"></script>
+<script src="staff-mfa.js"></script>
 <style>
 /* ── TOKENS ─────────────────────────────────────────────── */
 :root {
@@ -387,6 +388,7 @@ tr:hover td{background:var(--grey-50)}
           <div class="sb-uname" id="sb-uname">Receptionist</div>
           <div class="sb-urole" id="sb-urole">Reception Staff</div>
         </div>
+        <button class="sb-logout" onclick="StaffMFA.openSettings()" title="Two-factor sign-in" aria-label="Two-factor sign-in">🔒</button>
         <button class="sb-logout" onclick="doLogout()" title="Log out">↩</button>
       </div>
     </div>
@@ -664,6 +666,7 @@ tr:hover td{background:var(--grey-50)}
 const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+StaffMFA.init({ sb });
 // Invite patients / request access. Reception picks the doctor the request is for.
 PatientAccess.init({ sb, getDoctors: () => (R.doctors || []).map(d => ({ id: d.id, name: 'Dr. ' + d.first_name + ' ' + d.last_name })) });
 
@@ -762,6 +765,7 @@ async function doLogin(){
 }
 
 async function verifyAndLaunch(user){
+  if(!(await StaffMFA.require())) return;   // authenticator code, if they have set one up
   /* Staff sign in with a doctors row (doctors.auth_id) linked to a practice
      through practice_members.doctor_id */
   const {data:me}=await sb.from('doctors').select('id').eq('auth_id',user.id).order('created_at').limit(1).maybeSingle();
