@@ -1294,6 +1294,17 @@ const fromRX = x => ({ id:x.id, ref:x.ref_number, pid:x.patient_id, date:x.scrip
   meds:Array.isArray(x.medications)?x.medications:[], sigImg:x.sig_image||'' });
 const refNum = list => list.reduce((m,x)=>Math.max(m, parseInt(String(x.ref).replace(/\D/g,''),10)||0), 0);
 
+// Email the patient about a newly issued document. Never blocks or undoes the save.
+async function emailPatient(kind, id) {
+  try {
+    const { data, error } = await sbClient.functions.invoke('send-document-email', { body: { kind, id } });
+    if (error) throw error;
+    if (data && data.sent) toast('Emailed to the patient', 'success');
+    else if (data && data.reason === 'no_email') toast('Saved. This patient has no email address, so nothing was sent.', '');
+    else if (data && data.error) toast('Saved, but the email was not sent: ' + data.error, 'error');
+  } catch (e) { toast('Saved, but the email could not be sent', 'error'); }
+}
+
 async function loadLive() {
   const { data:{ user } } = await sbClient.auth.getUser();
   if (!user) return;
@@ -1724,7 +1735,7 @@ async function saveRec(){
   const rec={pid,date:document.getElementById('r-date').value,type:document.getElementById('r-type').value,diag,icd:document.getElementById('r-icd').value.trim(),vit:document.getElementById('r-vit').value.trim(),notes:document.getElementById('r-notes').value.trim(),meds:document.getElementById('r-meds').value.trim(),fu:document.getElementById('r-fu').value,ref:document.getElementById('r-ref').value.trim()};
   const {data,error}=await sbClient.from('records').insert({...toRec(rec),doctor_id:S.docId}).select().single();
   if(error){toast(error.message,'error');return}
-  S.records.push(fromRec(data));closeM('m-record');toast('Record saved','success');loadRecords(pid);
+  S.records.push(fromRec(data));closeM('m-record');toast('Record saved','success');loadRecords(pid);emailPatient('record',data.id);
 }
 function loadRecords(pid){const el=document.getElementById('rec-display');if(!pid){el.innerHTML='';return}const recs=S.records.filter(r=>r.pid===pid);const p=gp(pid);el.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">Records — ${fn(p)}</div><button class="btn btn-primary btn-sm" onclick="showAddRecord('${pid}')">+ Add</button></div><div style="padding:16px">${recs.length?recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="rec-item"><div class="rec-date">${r.date} · ${r.type}</div><div class="rec-title">${r.diag} <span class="pill pill-blue" style="font-size:10px">${r.icd}</span></div>${r.vit?`<div style="font-size:11px;color:var(--ink2);margin-bottom:4px;font-family:'JetBrains Mono',monospace">Vitals: ${r.vit}</div>`:''}<div class="rec-notes">${r.notes}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records for this patient</div>'}</div></div>`;}
 
@@ -1812,6 +1823,7 @@ async function saveSN(){
   const {data,error}=await sbClient.from('sick_notes').insert(row).select().single();
   if(error){S.snRef--;toast(error.message,'error');return}
   S.sickNotes.unshift(fromSN(data));
+  emailPatient('sick_note',data.id);
   closeM('m-sn');toast(ref+' issued','success');renderSNs();document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
 }
 function renderSNs(){
@@ -1895,6 +1907,7 @@ async function saveRX(){
   const {data,error}=await sbClient.from('prescriptions').insert(row).select().single();
   if(error){S.rxRef--;toast(error.message,'error');return}
   S.scripts.unshift(fromRX(data));
+  emailPatient('prescription',data.id);
   closeM('m-rx');toast(ref+' prescription issued','success');renderRXs();document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
 }
 function renderRXs(){
