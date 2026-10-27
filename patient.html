@@ -1169,6 +1169,10 @@ async function renderProfile() {
       <div id="access-list">${accessListHtml()}</div>
     </div>
     <div class="info-block">
+      <div class="info-title">Who has accessed my record</div>
+      <div id="access-log"><div class="info-row"><div style="font-size:13px;color:var(--ink2)">Loading…</div></div></div>
+    </div>
+    <div class="info-block">
       <div class="info-title">Personal Details</div>
       ${infoRow('Date of Birth', fmtDate(pat.dob) || '—')}
       ${infoRow('SA ID Number',  pat.idnum  || '—')}
@@ -1197,6 +1201,17 @@ async function renderProfile() {
       <div class="info-title">Emergency Contact</div>
       ${infoRow('Contact', pat.emer || '—')}
     </div>`;
+  loadAccessLog();
+}
+async function loadAccessLog() {
+  const el = document.getElementById('access-log'); if (!el) return;
+  const { data, error } = await sb.rpc('list_my_access_log');
+  if (error) { el.innerHTML = `<div class="info-row"><div style="font-size:13px;color:var(--ink2)">Could not load the access history.</div></div>`; return; }
+  if (!data || !data.length) { el.innerHTML = `<div class="info-row"><div style="font-size:13px;color:var(--ink2)">Nobody has opened or changed your record yet.</div></div>`; return; }
+  const verb = { view: 'Viewed', create: 'Added', update: 'Changed', delete: 'Deleted' };
+  const what = { patient: 'your file', record: 'a consultation record', sick_note: 'a sick note', prescription: 'a prescription' };
+  el.innerHTML = data.slice(0, 30).map(l => `<div class="info-row" style="gap:10px"><div class="info-key" style="min-width:90px">${esc(fmtDate(l.at.slice(0, 10)))}</div><div class="info-val">${esc(drLabel(l.dr_name || 'the practice'))} · ${verb[l.action] || l.action} ${what[l.subject] || ''}</div></div>`).join('')
+    + (data.length > 30 ? `<div class="info-row"><div style="font-size:12px;color:var(--ink3)">Showing the latest 30 of ${data.length}.</div></div>` : '');
 }
 function infoRow(k, v) {
   return `<div class="info-row"><div class="info-key">${k}</div><div class="info-val">${esc(String(v))}</div></div>`;
