@@ -4,6 +4,7 @@
  * email address or a phone number. The patient gets a link, signs in, and approves or declines.
  * Nothing is visible to the doctor until the patient approves.
  *
+ *   PatientAccess.init({ sb, getDoctors, onOpenDoc })   // onOpenDoc(kind, id) is optional: lets a doctor open a document to print it
  *   PatientAccess.init({ sb, getDoctors })   // getDoctors is optional: () => [{ id, name }]
  *   PatientAccess.open()                     // invite form
  *   PatientAccess.openRequests()             // list of requests and their status
@@ -12,7 +13,7 @@
  */
 (function () {
   'use strict';
-  var sb = null, getDoctors = null, root = null, tab = 'invite', last = null;
+  var sb = null, getDoctors = null, onOpenDoc = null, root = null, tab = 'invite', last = null;
   var FALLBACK_ORIGIN = 'https://medconsult.africa';
 
   var CSS = [
@@ -43,8 +44,8 @@
     '.pa-item .t{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;font-size:13.5px;font-weight:600}',
     '.pa-item .s{font-size:12px;color:var(--ink2,#5a5a65);margin-top:3px}',
     '.pa-pill{font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;white-space:nowrap}',
-    '.pa-pill.pending{background:#fff4e5;color:#b54708}.pa-pill.approved{background:#ecfdf3;color:#067647}',
-    '.pa-pill.declined,.pa-pill.revoked,.pa-pill.expired{background:#f2f4f7;color:#475467}',
+    '.pa-pill.pending,.pa-pill.requested{background:#fff4e5;color:#b54708}.pa-pill.approved,.pa-pill.ready{background:#ecfdf3;color:#067647}',
+    '.pa-pill.declined,.pa-pill.revoked,.pa-pill.expired,.pa-pill.collected,.pa-pill.cancelled{background:#f2f4f7;color:#475467}',
     '.pa-empty{text-align:center;color:var(--ink2,#5a5a65);font-size:13px;padding:24px 0}'
   ].join('');
 
@@ -87,6 +88,7 @@
         '<div class="pa-tabs">' +
           '<button class="pa-tab' + (tab === 'invite' ? ' on' : '') + '" data-a="tab-invite">Invite</button>' +
           '<button class="pa-tab' + (tab === 'requests' ? ' on' : '') + '" data-a="tab-requests">Requests</button>' +
+          '<button class="pa-tab' + (tab === 'prints' ? ' on' : '') + '" data-a="tab-prints">Print requests</button>' +
         '</div>' +
         '<div class="pa-bd">' + body + '</div>' +
       '</div>';
@@ -97,6 +99,9 @@
       if (a === 'close') close();
       else if (a === 'tab-invite') { tab = 'invite'; last = null; renderInvite(); }
       else if (a === 'tab-requests') { tab = 'requests'; renderRequests(); }
+      else if (a === 'tab-prints') { tab = 'prints'; renderPrints(); }
+      else if (a === 'print-open') { if (onOpenDoc) { close(); onOpenDoc(e.target.getAttribute('data-kind'), e.target.getAttribute('data-doc')); } }
+      else if (a === 'print-mark') markPrint(e.target.getAttribute('data-id'), e.target.getAttribute('data-s'));
       else if (a === 'create') create();
       else if (a === 'copy') copy(e.target.getAttribute('data-v'));
       else if (a === 'share') share();
@@ -205,6 +210,40 @@
     });
   }
 
+  // Printed copies patients asked for. Staff see type, date and reference only; the doctor opens the document to print it.
+  var KIND = { sick_note: 'Sick note', prescription: 'Prescription', record: 'Consultation record' };
+  function renderPrints() {
+    tab = 'prints'; ensureRoot(); root.style.display = 'flex';
+    shell('<div class="pa-empty">Loading…</div>');
+    sb.rpc('list_print_requests').then(function (r) {
+      var body = root.querySelector('.pa-bd');
+      if (r.error) { body.innerHTML = '<div class="pa-err">' + esc(r.error.message) + '</div>'; return; }
+      var rows = r.data || [];
+      if (!rows.length) { body.innerHTML = '<div class="pa-empty">No print requests.</div>'; return; }
+      var multi = {}; rows.forEach(function (x) { multi[x.dr_id] = 1; });
+      var showDr = Object.keys(multi).length > 1;
+      body.innerHTML = rows.map(function (x) {
+        var sub = [KIND[x.kind] || x.kind, x.doc_ref, x.doc_date ? new Date(x.doc_date + 'T00:00:00').toLocaleDateString() : '', showDr ? 'Dr. ' + x.dr_name : ''].filter(Boolean);
+        var id = esc(x.id), act = '';
+        if (x.status === 'requested') {
+          act = (onOpenDoc ? '<button class="pa-btn sm" data-a="print-open" data-kind="' + esc(x.kind) + '" data-doc="' + esc(x.doc_id) + '">Open to print</button>' : '') +
+                '<button class="pa-btn sm" data-a="print-mark" data-s="ready" data-id="' + id + '">Mark ready</button>';
+        } else if (x.status === 'ready') {
+          act = '<button class="pa-btn sm" data-a="print-mark" data-s="collected" data-id="' + id + '">Collected</button>';
+        }
+        if (x.status === 'requested' || x.status === 'ready') act += '<button class="pa-btn sm" data-a="print-mark" data-s="cancelled" data-id="' + id + '">Cancel</button>';
+        return '<div class="pa-item"><div class="t"><span>' + esc(x.patient_name) + '</span><span class="pa-pill ' + esc(x.status) + '">' + esc(x.status) + '</span></div>' +
+               '<div class="s">' + esc(sub.join(' · ')) + '</div>' + (act ? '<div class="pa-row" style="margin-top:8px">' + act + '</div>' : '') + '</div>';
+      }).join('') + '<div class="pa-err" role="alert"></div>';
+    });
+  }
+  function markPrint(id, status) {
+    sb.rpc('mark_print_request', { p_id: id, p_status: status }).then(function (r) {
+      if (r.error) { say(r.error.message, true); return; }
+      renderPrints();
+    });
+  }
+
   function cancel(id) {
     sb.rpc('cancel_access_request', { p_id: id }).then(function (r) {
       if (r.error) { say(r.error.message, true); return; }
@@ -213,8 +252,9 @@
   }
 
   window.PatientAccess = {
-    init: function (opts) { sb = opts.sb; getDoctors = opts.getDoctors || null; },
+    init: function (opts) { sb = opts.sb; getDoctors = opts.getDoctors || null; onOpenDoc = opts.onOpenDoc || null; },
     open: function () { if (!sb) return; last = null; renderInvite(); },
-    openRequests: function () { if (!sb) return; renderRequests(); }
+    openRequests: function () { if (!sb) return; renderRequests(); },
+    openPrints: function () { if (!sb) return; renderPrints(); }
   };
 })();

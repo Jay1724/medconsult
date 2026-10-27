@@ -752,9 +752,42 @@ async function ensureProfile(user) {
   return a2;
 }
 
+// ── PRINTED COPIES ───────────────────────────────────
+// Documents stay in the app. A patient can ask the practice to print one for them to collect.
+async function loadPrints() {
+  const { data } = await sb.rpc('list_my_print_requests');
+  ST.prints = data || [];
+}
+function openPrint(kind, id) { return (ST.prints || []).find(p => p.kind === kind && p.doc_id === id && ['requested', 'ready'].includes(p.status)); }
+function printCtl(kind, id) {
+  const p = openPrint(kind, id);
+  let inner;
+  if (!p) inner = `<button class="doc-view-btn" onclick="requestPrint('${kind}','${id}')">Request printed copy</button>`;
+  else if (p.status === 'ready') inner = `<span style="font-size:12px;font-weight:600;color:#067647">Ready to collect at the practice</span>`;
+  else inner = `<span style="font-size:12px;color:var(--ink2)">Print requested</span> <button class="doc-view-btn" onclick="cancelPrint('${p.id}','${kind}','${id}')">Cancel</button>`;
+  return `<span id="pc-${kind}-${id}">${inner}</span>`;
+}
+async function refreshPrint(kind, id) {
+  await loadPrints();
+  const el = document.getElementById(`pc-${kind}-${id}`);
+  if (el) el.outerHTML = printCtl(kind, id);
+}
+async function requestPrint(kind, id) {
+  const { error } = await sb.rpc('request_print', { p_kind: kind, p_doc: id });
+  if (error) { toast(error.message, 'error'); return; }
+  toast('Requested. The practice will let you know when it is ready.', 'success');
+  refreshPrint(kind, id);
+}
+async function cancelPrint(reqId, kind, id) {
+  const { error } = await sb.rpc('cancel_print_request', { p_id: reqId });
+  if (error) { toast(error.message, 'error'); return; }
+  refreshPrint(kind, id);
+}
+
 async function loadAccess() {
   const { data } = await sb.rpc('list_my_access');
   ST.access = data || [];
+  await loadPrints();
   const live = ST.access.find(a => a.access_status === 'approved');
   bkDoctorId = live ? live.dr_id : null;
 }
@@ -1021,6 +1054,7 @@ async function loadRecords() {
         ${r.meds  ? `<div class="rec-field"><div class="rec-field-label">Medication</div><div class="rec-field-val">${esc(r.meds)}</div></div>` : ''}
         ${r.fu    ? `<div class="rec-field"><div class="rec-field-label">Follow-up</div><div class="rec-field-val">${fmtDate(r.fu)}</div></div>` : ''}
         ${r.ref   ? `<div class="rec-field"><div class="rec-field-label">Referral</div><div class="rec-field-val">${esc(r.ref)}</div></div>` : ''}
+        <div style="margin-top:10px">${printCtl('record', r.id)}</div>
       </div>
     </div>`).join('');
 }
@@ -1052,6 +1086,7 @@ function docCard(d, type) {
       <div class="doc-type-tag">${label}</div>
       <div class="doc-date">${fmtDate(d.date)}</div>
       ${d.diag ? `<div class="doc-diag">${esc(d.diag)}</div>` : ''}
+      <div style="margin-top:8px">${printCtl(type, d.id)}</div>
     </div>
     <button class="doc-view-btn" onclick="viewDoc('${type}','${d.id}')">View</button>
   </div>`;
