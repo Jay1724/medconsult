@@ -16,9 +16,9 @@ BEGIN
 
   -- 1 doctor A writes a record: the database logs it with the doctor's identity
   EXECUTE 'RESET ROLE'; PERFORM set_config('request.jwt.claims', json_build_object('sub',u_da,'role','authenticated')::text, true); PERFORM set_config('request.jwt.claim.sub', u_da::text, true); EXECUTE 'SET LOCAL ROLE authenticated';
-  INSERT INTO records (doctor_id,patient_id,visit_date,diagnosis) VALUES (da,p1,current_date,'x') RETURNING id INTO rec;
-  UPDATE records SET notes='edited' WHERE id=rec;
+  rec := (create_record(jsonb_build_object('patient_id',p1,'visit_date',current_date,'diagnosis','x')) ->> 'id')::uuid;
   EXECUTE 'RESET ROLE';
+  UPDATE records SET notes='edited' WHERE id=rec;   -- claims still name doctor A, so the trigger logs them
   SELECT count(*) INTO n FROM access_log WHERE patient_id=p1 AND actor_doctor=da AND subject='record' AND action IN ('create','update');
   res := res || E'\n' || CASE WHEN n=2 THEN 'PASS' ELSE 'FAIL' END || ' 1 record create and update are logged with the doctor';
 
@@ -49,9 +49,7 @@ BEGIN
   EXECUTE 'RESET ROLE';
 
   -- 8 deleting is logged too (as the doctor); 9 anon cannot call log_view / list
-  PERFORM set_config('request.jwt.claims', json_build_object('sub',u_da,'role','authenticated')::text, true); PERFORM set_config('request.jwt.claim.sub', u_da::text, true); EXECUTE 'SET LOCAL ROLE authenticated';
-  DELETE FROM records WHERE id=rec;
-  EXECUTE 'RESET ROLE';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub',u_da,'role','authenticated')::text, true); PERFORM set_config('request.jwt.claim.sub', u_da::text, true); DELETE FROM records WHERE id=rec;
   SELECT count(*) INTO n FROM access_log WHERE action='delete' AND subject_id=rec AND actor_doctor=da;
   res := res || E'\n' || CASE WHEN n=1 THEN 'PASS' ELSE 'FAIL' END || ' 8 deleting a record is logged';
   PERFORM set_config('request.jwt.claims','',true); PERFORM set_config('request.jwt.claim.sub','',true); EXECUTE 'SET LOCAL ROLE anon';

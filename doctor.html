@@ -893,13 +893,13 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
     <!-- SICK NOTES -->
     <div class="page" id="pg-sicknotes">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px"><div style="font-size:13px;color:var(--ink2)">Issue and manage medical certificates</div><button class="btn btn-primary" onclick="showAddSN()">+ Issue Sick Note</button></div>
-      <div class="card"><div class="card-header"><div class="card-title">Sick Notes Issued</div></div><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Patient</th><th>Date Issued</th><th>Rest Period</th><th>Diagnosis</th><th>Actions</th></tr></thead><tbody id="sn-body"></tbody></table></div></div>
+      <div class="card"><div class="card-header"><div class="card-title">Sick Notes Issued</div></div><div class="table-wrap"><table><thead><tr><th>Reference</th><th>Patient</th><th>Date Issued</th><th>Rest Period</th><th>Actions</th></tr></thead><tbody id="sn-body"></tbody></table></div></div>
     </div>
 
     <!-- SCRIPTS -->
     <div class="page" id="pg-scripts">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px"><div style="font-size:13px;color:var(--ink2)">Electronic prescriptions</div><button class="btn btn-primary" onclick="showAddRX()">+ New Prescription</button></div>
-      <div class="card"><div class="card-header"><div class="card-title">Prescription History</div></div><div class="table-wrap"><table><thead><tr><th>Script Ref</th><th>Patient</th><th>Date</th><th>Medications</th><th>Repeats</th><th>Actions</th></tr></thead><tbody id="rx-body"></tbody></table></div></div>
+      <div class="card"><div class="card-header"><div class="card-title">Prescription History</div></div><div class="table-wrap"><table><thead><tr><th>Script Ref</th><th>Patient</th><th>Date</th><th>Actions</th></tr></thead><tbody id="rx-body"></tbody></table></div></div>
     </div>
 
     <!-- INVOICES -->
@@ -1271,7 +1271,7 @@ const S = {
   doc: null, docId: null, plan: 'pro',
   patients: [], records: [], invoices: [], claims: [], sickNotes: [], scripts: [],
   iNum: 1001, cNum: 5001,
-  snRef: 2400, rxRef: 3300,
+  snList: [], rxList: [],
 };
 
 let editPID = null, curPID = null;
@@ -1300,11 +1300,30 @@ const fromSN = n => ({ id:n.id, ref:n.ref_number, pid:n.patient_id, date:n.issue
   icd:n.icd10||'', inst:n.instructions||'', sigImg:n.sig_image||'' });
 const fromRX = x => ({ id:x.id, ref:x.ref_number, pid:x.patient_id, date:x.script_date, diag:x.diagnosis||'', rep:String(x.repeats||'0'),
   meds:Array.isArray(x.medications)?x.medications:[], sigImg:x.sig_image||'' });
-const refNum = list => list.reduce((m,x)=>Math.max(m, parseInt(String(x.ref).replace(/\D/g,''),10)||0), 0);
+// Clinical data never comes from the tables directly. Every read and write goes through a server function
+// that checks the second factor, the patient's permission, and writes the access log.
+const rpc = async (fnName, args) => { const { data, error } = await sbClient.rpc(fnName, args); if (error) throw error; return data; };
+const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+async function fetchFile(pid) {
+  const f = await rpc('get_patient_file', { p_patient: pid });
+  const other = x => x.pid !== pid;
+  S.records   = S.records.filter(other).concat((f.records || []).map(fromRec));
+  S.sickNotes = S.sickNotes.filter(other).concat((f.sick_notes || []).map(fromSN));
+  S.scripts   = S.scripts.filter(other).concat((f.prescriptions || []).map(fromRX));
+}
+async function refreshDocLists() {
+  const [sn, rx] = await Promise.all([
+    rpc('list_my_documents', { p_kind: 'sick_note' }).catch(() => []),
+    rpc('list_my_documents', { p_kind: 'prescription' }).catch(() => []),
+  ]);
+  S.snList = (sn || []).map(fromSN); S.rxList = (rx || []).map(fromRX);
+  const el = document.getElementById('s-docs'); if (el) el.textContent = S.snList.length + S.rxList.length;
+  renderSNs(); renderRXs();
+}
 
 // Print a consultation record for a patient who asked for a paper copy.
-function printRecord(id) {
-  const r = S.records.find(x => x.id === id); if (!r) { toast('Record not found', 'error'); return; }
+async function printRecord(id) {
+  let r; try { r = fromRec(await rpc('get_document', { p_kind: 'record', p_id: id })); } catch (e) { toast(e.message || 'Record not found', 'error'); return; }
   const p = gp(r.pid), e = t => String(t || '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   const row = (k, v) => v ? `<tr><td style="padding:6px 12px 6px 0;color:#666;font-size:12px;vertical-align:top;white-space:nowrap">${k}</td><td style="padding:6px 0">${e(v)}</td></tr>` : '';
   const w = window.open('', '_blank'); if (!w) { toast('Allow pop-ups to print', 'error'); return; }
@@ -1320,21 +1339,11 @@ async function loadLive() {
   if (!user) return;
   const { data:me } = await sbClient.from('doctors').select('id').eq('auth_id', user.id).order('created_at').limit(1).maybeSingle();
   S.docId = me ? me.id : null;
-  const [p, r, sn, rx] = await Promise.all([
-    sbClient.from('patients').select('*').order('last_name'),
-    sbClient.from('records').select('*').order('visit_date', { ascending:false }),
-    sbClient.from('sick_notes').select('*').order('issue_date', { ascending:false }),
-    sbClient.from('prescriptions').select('*').order('script_date', { ascending:false }),
-  ]);
-  const bad = [p, r, sn, rx].find(x => x.error);
-  if (bad) toast('Could not load some data: ' + bad.error.message, 'error');
-  S.patients  = (p.data  || []).map(fromPat);
-  S.records   = (r.data  || []).map(fromRec);
-  S.sickNotes = (sn.data || []).map(fromSN);
-  S.scripts   = (rx.data || []).map(fromRX);
-  S.snRef = Math.max(2400, refNum(S.sickNotes)) + 1;
-  S.rxRef = Math.max(3300, refNum(S.scripts)) + 1;
-  popSelects(); renderDash(); renderPats(); await loadToday();
+  const p = await sbClient.from('patients').select('*').order('last_name');
+  if (p.error) toast('Could not load some data: ' + p.error.message, 'error');
+  S.patients  = (p.data || []).map(fromPat);
+  S.records = []; S.sickNotes = []; S.scripts = [];     // filled one patient at a time, when a file is opened
+  popSelects(); renderDash(); renderPats(); await loadToday(); await refreshDocLists();
 }
 
 // ══════════════════════════════════════════════════
@@ -1629,7 +1638,7 @@ async function loadToday(){
 function renderDash(){
   document.getElementById('s-patients').textContent=S.patients.length;
   document.getElementById('s-invoices').textContent=S.invoices.filter(i=>i.status==='Pending').length;
-  document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
+  document.getElementById('s-docs').textContent=S.snList.length+S.rxList.length;
   document.getElementById('d-date').textContent=new Date().toLocaleDateString('en-ZA',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   document.getElementById('d-schedule').innerHTML=schedHtml(S.todayAppts||[]);
   document.getElementById('d-recent').innerHTML=S.patients.slice().reverse().slice(0,4).map(p=>`<div class="appt-row" onclick="openDetail('${p.id}')"><div class="mini-av" style="background:${p.col}">${ini(p)}</div><div class="appt-info"><div class="appt-name">${fn(p)}</div><div class="appt-type">${p.aid||'Private'} · ${p.chronic||'No chronic conditions'}</div></div></div>`).join('');
@@ -1711,21 +1720,22 @@ async function savePat(){
 // ══════════════════════════════════════════════════
 //  PATIENT DETAIL
 // ══════════════════════════════════════════════════
-function openDetail(id){
+async function openDetail(id){
   const p=gp(id); curPID=id;
-  sbClient.rpc('log_view',{p_patient:id}).then(()=>{},()=>{});   // access log: who opened this file
   document.getElementById('d-av').style.background=p.col;
   document.getElementById('d-av').style.borderRadius='12px';
   document.getElementById('d-av').textContent=ini(p);
   document.getElementById('d-name').textContent=fn(p);
   document.getElementById('d-meta').textContent=`${p.gen} · ${p.dob} · ${p.aid||'Private Patient'}`;
   document.getElementById('d-info').innerHTML=[['ID Number',p.idnum||'—'],['Blood Type',p.bl||'—'],['Phone',p.ph],['WhatsApp',p.wa||p.ph],['Email',p.em],['Address',p.addr||'—'],['Medical Aid',p.aid||'None'],['Aid Number',p.aidnum||'—'],['Plan',p.aidplan||'—'],['Aid Status',p.aid?MedicalAid.statusPill(p.aidstatus||'unverified').label:'—'],['Principal',p.principal||'Self'],['Allergies',p.allerg||'None known'],['Chronic',p.chronic||'None'],['Emergency',p.emer||'—']].map(([k,v])=>`<div class="info-cell"><div class="info-cell-label">${k}</div><div class="info-cell-value">${v}</div></div>`).join('');
+  let fileErr=null; try{await fetchFile(id)}catch(e){fileErr=e.message||'Could not open this record'}   // the server logs this view
   const recs=S.records.filter(r=>r.pid===id);
   document.getElementById('d-recs').innerHTML=recs.length?recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="rec-item"><div class="rec-date">${r.date} · ${r.type}</div><div class="rec-title">${r.diag} <span class="pill pill-blue" style="font-size:10px">${r.icd}</span></div><div class="rec-notes">${r.notes}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records yet</div>';
   const invs=S.invoices.filter(i=>i.pid===id);
   document.getElementById('d-invs').innerHTML=invs.length?invs.map(inv=>{const t=inv.lines.reduce((s,l)=>s+l.q*l.r,0)*1.15;return`<div class="rec-item" style="display:flex;align-items:center;gap:12px;cursor:pointer" onclick="previewInvById('${inv.id}')"><div style="flex:1"><div style="font-weight:600">${inv.num}</div><div style="font-size:11px;color:var(--ink2)">${inv.date}</div></div><div style="font-weight:600">${fc(t)}</div><span class="pill ${inv.status==='Paid'?'pill-green':'pill-yellow'}">${inv.status}</span></div>`}).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No invoices yet</div>';
   const sns=S.sickNotes.filter(s=>s.pid===id), rxs=S.scripts.filter(s=>s.pid===id);
   document.getElementById('d-docs').innerHTML=`<div style="display:flex;gap:8px;margin-bottom:14px"><button class="btn btn-ghost btn-sm" onclick="snForPat('${id}')">+ Sick Note</button><button class="btn btn-ghost btn-sm" onclick="rxForPat('${id}')">+ Prescription</button></div>${sns.map(s=>`<div class="rec-item" style="display:flex;align-items:center;gap:12px;cursor:pointer;margin-bottom:8px" onclick="viewSN('${s.id}')"><span style="font-size:20px">📄</span><div style="flex:1"><div style="font-weight:600">${s.ref} — Medical Certificate</div><div style="font-size:11px;color:var(--ink2)">${fd(s.date)} · Rest: ${fd(s.from)} to ${fd(s.to)}</div></div><button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();viewSN('${s.id}')">View</button></div>`).join('')}${rxs.map(s=>`<div class="rec-item" style="display:flex;align-items:center;gap:12px;cursor:pointer;margin-top:8px" onclick="viewRX('${s.id}')"><span style="font-size:20px">💊</span><div style="flex:1"><div style="font-weight:600">${s.ref} — Prescription</div><div style="font-size:11px;color:var(--ink2)">${fd(s.date)} · ${s.meds.map(m=>m.name).join(', ')}</div></div><button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();viewRX('${s.id}')">View</button></div>`).join('')}${!sns.length&&!rxs.length?'<div style="text-align:center;padding:32px;color:var(--ink2)">No documents issued yet</div>':''}`;
+  if(fileErr){const m=`<div style="text-align:center;padding:32px;color:var(--ink2)">${esc(fileErr)}</div>`;document.getElementById('d-recs').innerHTML=m;document.getElementById('d-docs').innerHTML=m}
   swTab(0);
   openM('m-detail');
 }
@@ -1746,11 +1756,11 @@ async function saveRec(){
   if(!pid||!diag){toast('Select patient and enter diagnosis','error');return}
   if(!S.docId){toast('Your doctor profile is not set up yet','error');return}
   const rec={pid,date:document.getElementById('r-date').value,type:document.getElementById('r-type').value,diag,icd:document.getElementById('r-icd').value.trim(),vit:document.getElementById('r-vit').value.trim(),notes:document.getElementById('r-notes').value.trim(),meds:document.getElementById('r-meds').value.trim(),fu:document.getElementById('r-fu').value,ref:document.getElementById('r-ref').value.trim()};
-  const {data,error}=await sbClient.from('records').insert({...toRec(rec),doctor_id:S.docId}).select().single();
+  const {data,error}=await sbClient.rpc('create_record',{p:toRec(rec)});
   if(error){toast(error.message,'error');return}
-  S.records.push(fromRec(data));closeM('m-record');toast('Record saved','success');loadRecords(pid);
+  closeM('m-record');toast('Record saved','success');loadRecords(pid);
 }
-function loadRecords(pid){const el=document.getElementById('rec-display');if(!pid){el.innerHTML='';return}sbClient.rpc('log_view',{p_patient:pid}).then(()=>{},()=>{});const recs=S.records.filter(r=>r.pid===pid);const p=gp(pid);el.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">Records — ${fn(p)}</div><button class="btn btn-primary btn-sm" onclick="showAddRecord('${pid}')">+ Add</button></div><div style="padding:16px">${recs.length?recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="rec-item"><div class="rec-date">${r.date} · ${r.type}</div><div class="rec-title">${r.diag} <span class="pill pill-blue" style="font-size:10px">${r.icd}</span></div>${r.vit?`<div style="font-size:11px;color:var(--ink2);margin-bottom:4px;font-family:'JetBrains Mono',monospace">Vitals: ${r.vit}</div>`:''}<div class="rec-notes">${r.notes}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):'<div style="text-align:center;padding:32px;color:var(--ink2)">No records for this patient</div>'}</div></div>`;}
+async function loadRecords(pid){const el=document.getElementById('rec-display');if(!pid){el.innerHTML='';return}let fileErr=null;try{await fetchFile(pid)}catch(e){fileErr=e.message||'Could not open this record'}const recs=S.records.filter(r=>r.pid===pid);const p=gp(pid);el.innerHTML=`<div class="card"><div class="card-header"><div class="card-title">Records — ${fn(p)}</div><button class="btn btn-primary btn-sm" onclick="showAddRecord('${pid}')">+ Add</button></div><div style="padding:16px">${recs.length?recs.sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<div class="rec-item"><div class="rec-date">${r.date} · ${r.type}</div><div class="rec-title">${r.diag} <span class="pill pill-blue" style="font-size:10px">${r.icd}</span></div>${r.vit?`<div style="font-size:11px;color:var(--ink2);margin-bottom:4px;font-family:'JetBrains Mono',monospace">Vitals: ${r.vit}</div>`:''}<div class="rec-notes">${r.notes}</div>${r.meds?`<div style="font-size:12px;margin-top:6px"><b>Rx:</b> ${r.meds}</div>`:''}</div>`).join(''):('<div style="text-align:center;padding:32px;color:var(--ink2)">'+esc(fileErr||'No records for this patient')+'</div>')}</div></div>`;}
 
 // ══════════════════════════════════════════════════
 //  SIGNATURE CANVASES
@@ -1830,21 +1840,19 @@ function snPrev(){
 async function saveSN(){
   const pid=document.getElementById('sn-pat').value,diag=document.getElementById('sn-diag').value.trim();
   if(!pid||!diag){toast('Select patient and enter diagnosis','error');return}
-  const ref='SN-'+S.snRef++;
-  if(!S.docId){toast('Your doctor profile is not set up yet','error');return}
-  const row={doctor_id:S.docId,patient_id:pid,ref_number:ref,issue_date:document.getElementById('sn-date').value,rest_from:document.getElementById('sn-from').value||null,rest_to:document.getElementById('sn-to').value||null,diagnosis:diag,icd10:document.getElementById('sn-icd').value.trim()||null,instructions:document.getElementById('sn-inst').value.trim()||null,sig_image:getSig('sn')||null};
-  const {data,error}=await sbClient.from('sick_notes').insert(row).select().single();
-  if(error){S.snRef--;toast(error.message,'error');return}
+  const row={patient_id:pid,issue_date:document.getElementById('sn-date').value,rest_from:document.getElementById('sn-from').value||null,rest_to:document.getElementById('sn-to').value||null,diagnosis:diag,icd10:document.getElementById('sn-icd').value.trim()||null,instructions:document.getElementById('sn-inst').value.trim()||null,sig_image:getSig('sn')||null};
+  const {data,error}=await sbClient.rpc('create_sick_note',{p:row});
+  if(error){toast(error.message,'error');return}
   S.sickNotes.unshift(fromSN(data));
-  closeM('m-sn');toast(ref+' issued','success');renderSNs();document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
+  closeM('m-sn');toast(data.ref_number+' issued','success');await refreshDocLists();
 }
 function renderSNs(){
   const tb=document.getElementById('sn-body');if(!tb)return;
-  if(!S.sickNotes.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--ink2)">No sick notes issued yet</td></tr>';return}
-  tb.innerHTML=S.sickNotes.map(s=>{const p=gp(s.pid);return`<tr><td style="font-weight:600;color:var(--azure);font-family:'JetBrains Mono',monospace">${s.ref}</td><td>${p?fn(p):'—'}</td><td>${fd(s.date)}</td><td style="font-size:12px">${fd(s.from)} → ${fd(s.to)}</td><td>${s.diag}</td><td><button class="btn btn-ghost btn-sm" onclick="viewSN('${s.id}')">View / Print</button></td></tr>`}).join('');
+  if(!S.snList.length){tb.innerHTML='<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--ink2)">No sick notes issued yet</td></tr>';return}
+  tb.innerHTML=S.snList.map(s=>{const p=gp(s.pid);return`<tr><td style="font-weight:600;color:var(--azure);font-family:'JetBrains Mono',monospace">${esc(s.ref)}</td><td>${p?fn(p):'—'}</td><td>${fd(s.date)}</td><td style="font-size:12px">${fd(s.from)} → ${fd(s.to)}</td><td><button class="btn btn-ghost btn-sm" onclick="viewSN('${s.id}')">View / Print</button></td></tr>`}).join('');
 }
-function viewSN(id){
-  const s=S.sickNotes.find(n=>n.id===id);if(!s)return;
+async function viewSN(id){
+  let s;try{s=fromSN(await rpc('get_document',{p_kind:'sick_note',p_id:id}))}catch(e){toast(e.message||'Could not open','error');return}
   const p=gp(s.pid);
   document.getElementById('sn-view-body').innerHTML=buildSNDoc({...s,patName:p?fn(p):'',patId:p?p.idnum:''});
   openM('m-sn-view');
@@ -1913,21 +1921,19 @@ function rxPrev(){
 async function saveRX(){
   const pid=document.getElementById('rx-pat').value;const meds=rxMeds.filter(m=>m.name.trim());
   if(!pid||!meds.length){toast('Select patient and add at least one medication','error');return}
-  const ref='RX-'+S.rxRef++;
-  if(!S.docId){S.rxRef--;toast('Your doctor profile is not set up yet','error');return}
-  const row={doctor_id:S.docId,patient_id:pid,ref_number:ref,script_date:document.getElementById('rx-date').value,diagnosis:document.getElementById('rx-diag').value.trim()||null,repeats:document.getElementById('rx-rep').value,medications:meds,sig_image:getSig('rx')||null};
-  const {data,error}=await sbClient.from('prescriptions').insert(row).select().single();
-  if(error){S.rxRef--;toast(error.message,'error');return}
+  const row={patient_id:pid,script_date:document.getElementById('rx-date').value,diagnosis:document.getElementById('rx-diag').value.trim()||null,repeats:document.getElementById('rx-rep').value,medications:meds,sig_image:getSig('rx')||null};
+  const {data,error}=await sbClient.rpc('create_prescription',{p:row});
+  if(error){toast(error.message,'error');return}
   S.scripts.unshift(fromRX(data));
-  closeM('m-rx');toast(ref+' prescription issued','success');renderRXs();document.getElementById('s-docs').textContent=S.sickNotes.length+S.scripts.length;
+  closeM('m-rx');toast(data.ref_number+' prescription issued','success');await refreshDocLists();
 }
 function renderRXs(){
   const tb=document.getElementById('rx-body');if(!tb)return;
-  if(!S.scripts.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--ink2)">No prescriptions issued yet</td></tr>';return}
-  tb.innerHTML=S.scripts.map(s=>{const p=gp(s.pid);return`<tr><td style="font-weight:600;color:var(--azure);font-family:'JetBrains Mono',monospace">${s.ref}</td><td>${p?fn(p):'—'}</td><td>${fd(s.date)}</td><td style="font-size:12px;color:var(--ink2)">${s.meds.map(m=>m.name+' '+m.str).join(', ')}</td><td>${s.rep==='0'?'None':s.rep+' repeat(s)'}</td><td><button class="btn btn-ghost btn-sm" onclick="viewRX('${s.id}')">View / Print</button></td></tr>`}).join('');
+  if(!S.rxList.length){tb.innerHTML='<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--ink2)">No prescriptions issued yet</td></tr>';return}
+  tb.innerHTML=S.rxList.map(s=>{const p=gp(s.pid);return`<tr><td style="font-weight:600;color:var(--azure);font-family:'JetBrains Mono',monospace">${esc(s.ref)}</td><td>${p?fn(p):'—'}</td><td>${fd(s.date)}</td><td><button class="btn btn-ghost btn-sm" onclick="viewRX('${s.id}')">View / Print</button></td></tr>`}).join('');
 }
-function viewRX(id){
-  const s=S.scripts.find(r=>r.id===id);if(!s)return;
+async function viewRX(id){
+  let s;try{s=fromRX(await rpc('get_document',{p_kind:'prescription',p_id:id}))}catch(e){toast(e.message||'Could not open','error');return}
   const p=gp(s.pid);
   document.getElementById('rx-view-body').innerHTML=buildRXDoc({...s,patName:p?fn(p):'',patDob:p?p.dob:'',patId:p?p.idnum:''});
   openM('m-rx-view');
