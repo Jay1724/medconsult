@@ -479,6 +479,10 @@ body {
     <div class="field"><label>Email</label><input type="email" id="r-email" placeholder="your@email.com" autocomplete="email"></div>
     <div class="field"><label>Password</label><input type="password" id="r-pw" placeholder="Min 8 characters" autocomplete="new-password"></div>
     <div class="field"><label>Confirm Password</label><input type="password" id="r-pw2" placeholder="Repeat password" autocomplete="new-password"></div>
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--ink2);line-height:1.55;margin:2px 0 14px">
+      <input type="checkbox" id="r-consent" style="margin-top:3px;flex-shrink:0">
+      <span>I have read the <a href="privacy.html" target="_blank" rel="noopener">privacy notice</a>. I consent to MedConsult storing my personal and health information on servers in London (United Kingdom), outside South Africa, and sharing it only with doctors I approve.</span>
+    </label>
     <button class="btn-primary" id="reg-btn" onclick="doRegister()">Create Account</button>
     <p class="auth-note">Create your own health profile. Doctors can only see your records after you approve their request.</p>
   </div>
@@ -587,6 +591,7 @@ const ST = { user: null, account: null, patient: null, doctor: null };
 let inviteToken = null;
 let inviteValid = false;
 let bkStep = 1, bkDate = null, bkSlot = null, bkDoctorId = null;
+const CONSENT_VERSION = '2026-10-27';   // must match current_consent_version() in the database
 let accessToken = null;   // ?access=TOKEN from a doctor's request link
 ST.access = [];
 
@@ -682,10 +687,11 @@ async function doRegister() {
   const pw2   = document.getElementById('r-pw2').value;
   if (!inviteValid && (!fname || !lname)) { toast('Please enter your first and last name', 'error'); return; }
   if (!email || !pw)    { toast('Please fill all fields', 'error'); return; }
+  if (!document.getElementById('r-consent').checked) { toast('Please tick the consent box to continue', 'error'); return; }
   if (pw.length < 8)    { toast('Password must be at least 8 characters', 'error'); return; }
   if (pw !== pw2)       { toast('Passwords do not match', 'error'); return; }
   setBtn('reg-btn', 'Creating account…', true);
-  const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { first_name: fname, last_name: lname } } });
+  const { data, error } = await sb.auth.signUp({ email, password: pw, options: { data: { first_name: fname, last_name: lname, consent_version: CONSENT_VERSION } } });
   if (error) { setBtn('reg-btn', 'Create Account', false); toast(error.message, 'error'); return; }
   // The link to the patient record is made by the server (accept_patient_invite) once the
   // email is verified and matches the invite. Remember the token until then.
@@ -784,6 +790,39 @@ async function cancelPrint(reqId, kind, id) {
   refreshPrint(kind, id);
 }
 
+// Nothing in the portal loads until the patient has accepted the current privacy notice and the transfer to the UK.
+async function ensureConsent(user) {
+  const { data: ok } = await sb.rpc('my_consent_ok');
+  if (ok) return;
+  // They ticked the box when signing up for this version: record it now that they have a verified session.
+  if ((user.user_metadata || {}).consent_version === CONSENT_VERSION) {
+    const { error } = await sb.rpc('record_consent', { p_version: CONSENT_VERSION });
+    if (!error) return;
+  }
+  await new Promise(resolve => {
+    const ov = document.createElement('div');
+    ov.className = 'sheet-overlay open';
+    ov.innerHTML = `<div class="sheet"><div class="sheet-handle"></div>
+      <div class="sheet-title">Your privacy</div>
+      <div class="sheet-sub">Please read this before we open your profile</div>
+      <p style="font-size:13px;color:var(--ink2);line-height:1.65;margin:14px 0">
+        MedConsult stores your personal and health information so you and the doctors you approve can use it. It is kept on servers in
+        <strong>London (United Kingdom)</strong>, outside South Africa, under a data protection agreement. No doctor sees anything until you approve them,
+        and you can revoke access and see who has opened your record at any time. You can withdraw consent or ask for your information to be corrected or deleted whenever you like.
+        Read the full <a href="privacy.html" target="_blank" rel="noopener">privacy notice</a>.</p>
+      <button class="btn-primary" id="consent-yes">I agree and continue</button>
+      <button class="btn-ghost" style="margin-top:10px" id="consent-no">Sign out</button></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('#consent-no').onclick = () => doLogout();
+    ov.querySelector('#consent-yes').onclick = async () => {
+      setBtn('consent-yes', 'Saving…', true);
+      const { error } = await sb.rpc('record_consent', { p_version: CONSENT_VERSION });
+      if (error) { setBtn('consent-yes', 'I agree and continue', false); toast(error.message, 'error'); return; }
+      ov.remove(); resolve();
+    };
+  });
+}
+
 async function loadAccess() {
   const { data } = await sb.rpc('list_my_access');
   ST.access = data || [];
@@ -798,6 +837,7 @@ async function loadPatient(user) {
   const acct = await ensureProfile(user);
   if (!acct) return;
   ST.account = acct;
+  await ensureConsent(user);
   // A doctor's request link: attach it to this profile (it still needs the patient's approval).
   let tok = null;
   try { tok = sessionStorage.getItem('mc_access_token'); } catch (e) {}
