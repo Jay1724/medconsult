@@ -16,13 +16,14 @@ POPIA s72 allows a transfer abroad when the recipient is bound by an agreement g
 | Patients can see who accessed their record | popia_hardening.sql, Profile tab |
 | Open "anyone can create a practice" rule removed | popia_hardening.sql |
 | Links to unregistered patients expire (14 days) and only verified emails match | patient_access.sql |
+| Doctors read and write clinical data only through server functions: second factor, clinician-only, patient permission checked, view logged by the database. Direct table access for doctors removed. Issue lists show reference/patient/date only | clinical_reads.sql |
 
 ## Still to build (in this order)
-1. Consent and privacy notice shown at patient sign-up, with the version and time stored.
+1. ~~Consent and privacy notice at patient sign-up~~ (consent.sql, PR #15).
 2. Front-desk view so receptionists cannot read allergies or chronic conditions through the API.
 3. Patient rights: download my data, ask for correction, ask for deletion (with the HPCSA retention carve-out, which keeps clinical notes for the legal retention period).
-4. Two-factor sign-in for doctors.
-5. Move clinical reads behind functions so views are logged by the database, not just the app.
+4. ~~Two-factor sign-in for doctors~~ (staff_mfa.sql, PR #16).
+5. ~~Clinical reads behind logged functions~~ (clinical_reads.sql).
 6. Retention schedule and automated clean-up of expired invites and old logs.
 
 ## Non-code tasks (you)

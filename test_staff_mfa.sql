@@ -17,12 +17,12 @@ BEGIN
   EXECUTE 'RESET ROLE'; PERFORM set_config('request.jwt.claims', json_build_object('sub',u_d,'role','authenticated','aal','aal1')::text, true); PERFORM set_config('request.jwt.claim.sub', u_d::text, true); EXECUTE 'SET LOCAL ROLE authenticated';
   SELECT count(*) INTO n FROM patients;
   res := res || E'\n' || CASE WHEN n=0 THEN 'PASS' ELSE 'FAIL' END || ' 1 enrolled doctor with a password-only session sees no patients';
-  BEGIN INSERT INTO records (doctor_id,patient_id,visit_date,diagnosis) VALUES (d,p,current_date,'x'); res := res || E'\nFAIL 2 aal1 write allowed'; EXCEPTION WHEN OTHERS THEN res := res || E'\nPASS 2 and cannot write records either'; END;
+  BEGIN PERFORM create_record(jsonb_build_object('patient_id',p,'visit_date',current_date,'diagnosis','x')); res := res || E'\nFAIL 2 aal1 write allowed'; EXCEPTION WHEN OTHERS THEN res := res || E'\nPASS 2 and cannot write records either'; END;
   -- 3 same doctor after the code (aal2)
   PERFORM set_config('request.jwt.claims', json_build_object('sub',u_d,'role','authenticated','aal','aal2')::text, true);
   SELECT count(*) INTO n FROM patients;
   res := res || E'\n' || CASE WHEN n=1 THEN 'PASS' ELSE 'FAIL' END || ' 3 after the second step the doctor sees their patient';
-  INSERT INTO records (doctor_id,patient_id,visit_date,diagnosis) VALUES (d,p,current_date,'x');
+  PERFORM create_record(jsonb_build_object('patient_id',p,'visit_date',current_date,'diagnosis','x'));
   res := res || E'\nPASS 4 and can write';
   -- 5 a doctor who has not enrolled is unaffected while the switch is off
   EXECUTE 'RESET ROLE'; PERFORM set_config('request.jwt.claims', json_build_object('sub',u_n,'role','authenticated','aal','aal1')::text, true); PERFORM set_config('request.jwt.claim.sub', u_n::text, true); EXECUTE 'SET LOCAL ROLE authenticated';

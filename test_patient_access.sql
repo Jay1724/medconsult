@@ -85,7 +85,7 @@ BEGIN
   SELECT count(*) INTO n FROM patients WHERE id = pid;
   res := res || E'\n' || CASE WHEN n = 0 THEN 'PASS' ELSE 'FAIL' END || ' 4a doctor cannot read the profile before approval';
   BEGIN
-    INSERT INTO records (doctor_id, patient_id, visit_date, diagnosis) VALUES (da, pid, current_date, 'Test');
+    PERFORM create_record(jsonb_build_object('patient_id', pid, 'visit_date', current_date, 'diagnosis', 'Test'));
     res := res || E'\nFAIL 4b doctor wrote a record before approval';
   EXCEPTION WHEN OTHERS THEN res := res || E'\nPASS 4b record write blocked before approval';
   END;
@@ -107,8 +107,8 @@ BEGIN
   res := res || E'\n' || CASE WHEN n = 1 THEN 'PASS' ELSE 'FAIL' END || ' 6a doctor reads the approved profile';
   SELECT count(*) INTO n FROM patients WHERE id = pid AND allergies = 'Penicillin';
   res := res || E'\n' || CASE WHEN n = 1 THEN 'PASS' ELSE 'FAIL' END || ' 6b doctor sees the patient-entered allergies';
-  INSERT INTO records (doctor_id, patient_id, visit_date, diagnosis) VALUES (da, pid, current_date, 'Test visit');
-  SELECT count(*) INTO n FROM records WHERE patient_id = pid;
+  PERFORM create_record(jsonb_build_object('patient_id', pid, 'visit_date', current_date, 'diagnosis', 'Test visit'));
+  n := jsonb_array_length(get_patient_file(pid) -> 'records');
   res := res || E'\n' || CASE WHEN n = 1 THEN 'PASS' ELSE 'FAIL' END || ' 6c doctor wrote and reads the record';
   EXECUTE 'RESET ROLE';
   PERFORM set_config('request.jwt.claims', json_build_object('sub', u_p1, 'role', 'authenticated')::text, true);
@@ -127,7 +127,7 @@ BEGIN
   SELECT count(*) INTO n FROM records WHERE patient_id = pid;
   res := res || E'\n' || CASE WHEN n = 0 THEN 'PASS' ELSE 'FAIL' END || ' 7b other doctor cannot read records';
   BEGIN
-    INSERT INTO records (doctor_id, patient_id, visit_date, diagnosis) VALUES (db, pid, current_date, 'Intrusion');
+    PERFORM create_record(jsonb_build_object('patient_id', pid, 'visit_date', current_date, 'diagnosis', 'Intrusion'));
     res := res || E'\nFAIL 7c other doctor wrote a record';
   EXCEPTION WHEN OTHERS THEN res := res || E'\nPASS 7c other doctor cannot write a record';
   END;
@@ -192,10 +192,10 @@ BEGIN
   EXECUTE 'SET LOCAL ROLE authenticated';
   SELECT count(*) INTO n FROM patients WHERE id = pid;
   res := res || E'\n' || CASE WHEN n = 0 THEN 'PASS' ELSE 'FAIL' END || ' 9a doctor loses the profile after revoke';
-  SELECT count(*) INTO n FROM records WHERE patient_id = pid;
-  res := res || E'\n' || CASE WHEN n = 1 THEN 'PASS' ELSE 'FAIL' END || ' 9b author still reads their own note';
+  BEGIN PERFORM get_patient_file(pid); n := 1; EXCEPTION WHEN OTHERS THEN n := 0; END;
+  res := res || E'\n' || CASE WHEN n = 0 THEN 'PASS' ELSE 'FAIL' END || ' 9b after revoke even the author cannot open the file';
   BEGIN
-    INSERT INTO records (doctor_id, patient_id, visit_date, diagnosis) VALUES (da, pid, current_date, 'After revoke');
+    PERFORM create_record(jsonb_build_object('patient_id', pid, 'visit_date', current_date, 'diagnosis', 'After revoke'));
     res := res || E'\nFAIL 9c doctor wrote a record after revoke';
   EXCEPTION WHEN OTHERS THEN res := res || E'\nPASS 9c record write blocked after revoke';
   END;
