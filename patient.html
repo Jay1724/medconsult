@@ -120,6 +120,15 @@ body {
   -webkit-appearance: none;
 }
 .field input:focus { border-color: var(--azure); box-shadow: 0 0 0 3px var(--azure-dim); }
+.field select, .field textarea {
+  width: 100%; padding: 13px 15px; background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); font-family: 'Sora', sans-serif; font-size: 15px; color: var(--ink);
+  outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field textarea { resize: vertical; min-height: 64px; }
+.field select:focus, .field textarea:focus { border-color: var(--azure); box-shadow: 0 0 0 3px var(--azure-dim); }
+.field .hint { font-size: 12px; color: var(--ink3); margin-top: 5px; line-height: 1.5; }
+.form-h { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; color: var(--azure); margin: 22px 0 12px; }
 .field input::placeholder { color: var(--ink3); }
 
 .btn-primary {
@@ -791,6 +800,65 @@ async function cancelPrint(reqId, kind, id) {
 }
 
 // Nothing in the portal loads until the patient has accepted the current privacy notice and the transfer to the UK.
+// ── COMPLETE / EDIT MY DETAILS ───────────────────────
+function profileMissing() {
+  const p = ST.patient; if (!p) return [];
+  const need = [['dob', 'date of birth'], ['gender', 'gender'], ['phone', 'phone number'], ['address', 'address'], ['emergency', 'emergency contact']];
+  return need.filter(([k]) => !String(p[k] || '').trim()).map(([, label]) => label);
+}
+function openProfileEditor(firstRun) {
+  const p = ST.patient; if (!p) return;
+  const v = k => esc(p[k] || '');
+  const opt = (list, cur) => ['', ...list].map(o => `<option value="${esc(o)}"${o === (cur || '') ? ' selected' : ''}>${o || 'Select…'}</option>`).join('');
+  document.getElementById('profile-editor')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'profile-editor'; ov.className = 'sheet-overlay open';
+  ov.innerHTML = `<div class="sheet"><div class="sheet-handle"></div>
+    <div class="sheet-title">${firstRun ? 'Welcome. Tell us about you' : 'My details'}</div>
+    <div class="sheet-sub">${firstRun ? 'Add what you can now. Everything is optional and you can change it any time.' : 'Only you and the doctors you approve can see these.'}</div>
+    <div class="form-h" style="margin-top:0">About you</div>
+    <div class="field"><label>First name</label><input id="pe-first_name" value="${v('first_name')}" autocomplete="given-name"></div>
+    <div class="field"><label>Last name</label><input id="pe-last_name" value="${v('last_name')}" autocomplete="family-name"></div>
+    <div class="field"><label>Date of birth</label><input id="pe-dob" type="date" value="${v('dob')}" max="${isoDate(new Date())}"></div>
+    <div class="field"><label>SA ID number</label><input id="pe-id_number" inputmode="numeric" maxlength="13" value="${v('id_number')}"><div class="hint">13 digits. Helps your doctor match your medical aid.</div></div>
+    <div class="field"><label>Gender</label><select id="pe-gender">${opt(['Female', 'Male', 'Other'], p.gender)}</select></div>
+    <div class="form-h">Contact</div>
+    <div class="field"><label>Phone</label><input id="pe-phone" type="tel" value="${v('phone')}" autocomplete="tel" placeholder="082 123 4567"></div>
+    <div class="field"><label>WhatsApp (if different)</label><input id="pe-whatsapp" type="tel" value="${v('whatsapp')}"></div>
+    <div class="field"><label>Address</label><textarea id="pe-address" autocomplete="street-address">${v('address')}</textarea></div>
+    <div class="form-h">Health basics</div>
+    <div class="field"><label>Blood type</label><select id="pe-blood_type">${opt(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'], p.blood_type)}</select></div>
+    <div class="field"><label>Allergies</label><textarea id="pe-allergies" placeholder="e.g. Penicillin">${v('allergies')}</textarea></div>
+    <div class="field"><label>Chronic conditions</label><textarea id="pe-chronic" placeholder="e.g. Asthma, hypertension">${v('chronic')}</textarea></div>
+    <div class="field"><label>Emergency contact</label><input id="pe-emergency" value="${v('emergency')}" placeholder="Name and phone number"></div>
+    <div class="form-h">Medical aid</div>
+    <div class="field"><label>Scheme</label><input id="pe-aid_provider" value="${v('aid_provider')}" placeholder="Leave empty if you pay privately"></div>
+    <div class="field"><label>Member number</label><input id="pe-aid_number" value="${v('aid_number')}"></div>
+    <div class="field"><label>Plan / option</label><input id="pe-aid_plan" value="${v('aid_plan')}"></div>
+    <div class="field"><label>Main member (if not you)</label><input id="pe-principal" value="${v('principal')}"><div class="hint">Changing medical aid details means your practice checks them again.</div></div>
+    <button class="btn-primary" id="pe-save">Save</button>
+    <button class="btn-ghost" style="margin-top:10px" id="pe-cancel">${firstRun ? 'Skip for now' : 'Cancel'}</button></div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#pe-cancel').onclick = () => ov.remove();
+  ov.querySelector('#pe-save').onclick = saveProfile;
+}
+async function saveProfile() {
+  const keys = ['first_name', 'last_name', 'dob', 'id_number', 'gender', 'phone', 'whatsapp', 'address', 'blood_type',
+                'allergies', 'chronic', 'emergency', 'aid_provider', 'aid_number', 'aid_plan', 'principal'];
+  const changes = {};
+  keys.forEach(k => { changes[k] = (document.getElementById('pe-' + k).value || '').trim(); });
+  if (!changes.first_name || !changes.last_name) { toast('Enter your first and last name', 'error'); return; }
+  if (changes.id_number && !/^\d{13}$/.test(changes.id_number)) { toast('An ID number has 13 digits', 'error'); return; }
+  setBtn('pe-save', 'Saving…', true);
+  const { error } = await sb.rpc('update_my_profile', { p_changes: changes });
+  if (error) { setBtn('pe-save', 'Save', false); toast(error.message, 'error'); return; }
+  const { data: pat } = await sb.from('patients').select('*').eq('id', ST.account.patient_id).single();
+  ST.patient = normPatient(pat);
+  document.getElementById('profile-editor')?.remove();
+  toast('Details saved', 'success');
+  renderHome(); renderProfile();
+}
+
 async function ensureConsent(user) {
   const { data: ok } = await sb.rpc('my_consent_ok');
   if (ok) return;
@@ -885,13 +953,20 @@ function renderHome() {
   document.getElementById('home-date').textContent = `${days[now.getDay()]}, ${now.getDate()} ${mons[now.getMonth()]} ${now.getFullYear()}`;
   renderAccessBanner();
   loadNextAppt();
+  // A brand-new profile is empty: offer the form once per visit.
+  if (!ST.profilePrompted && ST.patient && profileMissing().length >= 4) { ST.profilePrompted = true; setTimeout(() => openProfileEditor(true), 400); }
 }
 
 function renderAccessBanner() {
   const el = document.getElementById('access-banner');
   const pend = (ST.access || []).filter(a => a.access_status === 'pending');
-  if (!pend.length) { el.innerHTML = ''; return; }
-  el.innerHTML = `<div class="card" style="margin-bottom:12px;cursor:pointer;border-left:4px solid var(--azure)" onclick="switchTab('profile')">
+  const miss = profileMissing();
+  const completeCard = miss.length ? `<div class="card" style="margin-bottom:12px;cursor:pointer;border-left:4px solid var(--azure)" onclick="openProfileEditor()">
+    <div style="font-size:14px;font-weight:700;color:var(--ink)">Complete your profile</div>
+    <div style="font-size:12px;color:var(--ink2);margin-top:4px">Still missing: ${miss.map(m => esc(m)).join(', ')}. Doctors you approve will see these details. Tap to add them.</div>
+  </div>` : '';
+  if (!pend.length) { el.innerHTML = completeCard; return; }
+  el.innerHTML = completeCard + `<div class="card" style="margin-bottom:12px;cursor:pointer;border-left:4px solid var(--azure)" onclick="switchTab('profile')">
     <div style="font-size:14px;font-weight:700;color:var(--ink)">${pend.length === 1 ? 'A doctor is asking to see your records' : pend.length + ' doctors are asking to see your records'}</div>
     <div style="font-size:12px;color:var(--ink2);margin-top:4px">Tap to review. Nobody sees anything until you approve.</div>
   </div>`;
@@ -1204,6 +1279,7 @@ async function renderProfile() {
         <div class="profile-em">${esc(pat.em || ST.user?.email || '')}</div>
       </div>
     </div>
+    <button class="btn-primary" style="margin-bottom:14px" onclick="openProfileEditor()">${profileMissing().length ? 'Complete my details' : 'Edit my details'}</button>
     <div class="info-block">
       <div class="info-title">Doctors &amp; access</div>
       <div id="access-list">${accessListHtml()}</div>
@@ -1229,6 +1305,7 @@ async function renderProfile() {
       ${infoRow('Provider',      pat.aid     || 'None / Private')}
       ${pat.aid ? infoRow('Member Number', pat.aidnum  || '—') : ''}
       ${pat.aid ? infoRow('Plan / Option',  pat.aidplan || '—') : ''}
+      ${pat.aid && pat.principal ? infoRow('Main member', pat.principal) : ''}
     </div>
     <div class="info-block">
       <div class="info-title">Contact</div>
