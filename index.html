@@ -51,6 +51,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 48px;height:64px;
 .nav-cta{display:flex;align-items:center;gap:12px}
 .btn-nav-ghost{font-size:14px;font-weight:500;color:var(--grey-600);padding:8px 16px;border-radius:var(--radius-sm);transition:all 0.2s;cursor:pointer;background:none;border:none;font-family:'Sora',sans-serif}
 .btn-nav-ghost:hover{color:var(--black);background:var(--grey-50)}
+.btn-nav-ghost,.btn-nav-primary{white-space:nowrap}
 .btn-nav-primary{font-size:14px;font-weight:600;color:var(--white);background:var(--azure);padding:9px 20px;border-radius:var(--radius-sm);border:none;cursor:pointer;font-family:'Sora',sans-serif;transition:all 0.2s;box-shadow:var(--shadow-azure)}
 .btn-nav-primary:hover{background:var(--azure-light);transform:translateY(-1px);box-shadow:0 10px 36px rgba(43,127,255,0.32)}
 
@@ -103,6 +104,7 @@ nav{position:fixed;top:0;left:0;right:0;z-index:1000;padding:0 48px;height:64px;
 .bento-azure .bento-card-icon{background:rgba(255,255,255,0.2);color:var(--white)}
 .bento-azure:hover{box-shadow:var(--shadow-azure)}
 .bento-tinted{background:linear-gradient(135deg,#f0f5ff 0%,#f8faff 100%);border-color:rgba(43,127,255,0.15)}
+.bento-split{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
 .bento-card-icon{width:44px;height:44px;background:var(--azure-dim);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:20px;color:var(--azure);flex-shrink:0}
 .bento-card-eyebrow{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--azure);margin-bottom:8px}
 .bento-card-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:600;letter-spacing:-0.5px;color:var(--black);line-height:1.25;margin-bottom:10px}
@@ -309,8 +311,20 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
   .compare-table{display:none}
   .cost-examples{padding:24px 20px}
   .cost-grid{grid-template-columns:1fr}
+  .bento-split{grid-template-columns:1fr;gap:28px}
+  .bento-card{padding:24px}
+  .nav-cta{gap:4px}
+  .btn-nav-ghost{padding:8px 10px}
+  .btn-nav-primary{padding:9px 14px}
 }
 @media(max-width:480px){
+  nav{padding:0 14px}
+  .nav-logo{gap:8px;min-width:0}
+  .nav-logo-text{font-size:16px}
+  .btn-nav-ghost,.btn-nav-primary{font-size:13px}
+  .btn-nav-primary{padding:8px 12px}
+  .hero-eyebrow{font-size:11px;letter-spacing:0.3px;padding:6px 14px;text-align:center}
+  .hero-headline{letter-spacing:-1px}
   .hero-actions,.cta-actions{flex-direction:column;width:100%}
   .btn-hero-primary,.btn-hero-ghost{width:100%;justify-content:center}
   .stats-inner,.footer-inner{grid-template-columns:1fr}
@@ -322,6 +336,7 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
 .hero-trust-item .material-icons{font-size:15px}
 .persona-emoji .material-icons{font-size:40px;color:var(--azure)}
 </style>
+<link rel="stylesheet" href="/assets/mobile.css">
 </head>
 <body>
 
@@ -460,7 +475,7 @@ footer{background:var(--grey-950);padding:64px 48px 40px;border-top:1px solid va
       </div>
     </div>
     <div class="bento-card bento-span-12 reveal">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center">
+      <div class="bento-split">
         <div>
           <div class="bento-card-icon"><span class="material-icons">bar_chart</span></div>
           <div class="bento-card-eyebrow">Practice Intelligence</div>

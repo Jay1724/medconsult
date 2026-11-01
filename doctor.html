@@ -610,6 +610,14 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
 
 /* ════ RESPONSIVE ════ */
 @media (max-width: 1100px) { .stats-grid { grid-template-columns: 1fr 1fr; } .qa-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 860px) {
+  #auth-screen { flex-direction: column; overflow-y: auto; }
+  .auth-left { width: 100%; flex: none; padding: 28px 24px 20px; }
+  .auth-brand-name { font-size: 30px; }
+  .auth-features, .auth-quote { display: none; }
+  .auth-right { flex: 1 0 auto; align-items: flex-start; overflow-y: visible; padding: 28px 20px 40px; }
+  .auth-2col { grid-template-columns: 1fr; }
+}
 @media (max-width: 860px) { .consult-grid { grid-template-columns: 1fr; } }
 
 /* ════ CALENDAR ════ */
@@ -650,6 +658,7 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
 .avail-inputs select, .avail-inputs input { padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 12px; color: var(--ink); outline: none; width: 100%; }
 .avail-inputs select:focus, .avail-inputs input:focus { border-color: var(--azure); box-shadow: 0 0 0 3px var(--azure-dim); }
 </style>
+<link rel="stylesheet" href="/assets/mobile.css">
 </head>
 <body>
 
