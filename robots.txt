@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /doctor.html
+Disallow: /reception.html
+Disallow: /practice.html
+Disallow: /patient.html
+
+Sitemap: https://medconsult.africa/sitemap.xml
