@@ -274,6 +274,11 @@ body {
   animation: slideUp 0.3s cubic-bezier(0.32,0.72,0,1);
 }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.sheet-x-row { position: sticky; top: 0; height: 0; display: flex; justify-content: flex-end; z-index: 5; }
+.sheet-x { width: 34px; height: 34px; margin-top: 6px; border-radius: 50%; border: none; background: var(--surface-2, #f2f2f6); color: var(--ink2);
+  font-size: 22px; line-height: 1; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+.sheet-x:active { background: var(--border); }
+.sheet-title { padding-right: 40px; }
 .sheet-handle { width: 36px; height: 4px; background: var(--border); border-radius: 2px; margin: 12px auto 20px; }
 .sheet-title  { font-size: 19px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
 .sheet-sub    { font-size: 13px; color: var(--ink2); margin-bottom: 20px; }
@@ -583,6 +588,7 @@ body {
 <!-- BOOKING SHEET -->
 <div class="sheet-overlay" id="booking-overlay" onclick="overlayTap(event)">
   <div class="sheet">
+    <div class="sheet-x-row"><button class="sheet-x" onclick="closeBooking()" aria-label="Close">&times;</button></div>
     <div class="sheet-handle"></div>
     <div id="booking-body"></div>
   </div>
@@ -816,7 +822,7 @@ function openProfileEditor(firstRun) {
   document.getElementById('profile-editor')?.remove();
   const ov = document.createElement('div');
   ov.id = 'profile-editor'; ov.className = 'sheet-overlay open';
-  ov.innerHTML = `<div class="sheet"><div class="sheet-handle"></div>
+  ov.innerHTML = `<div class="sheet"><div class="sheet-x-row"><button class="sheet-x" id="pe-x" aria-label="Close">&times;</button></div><div class="sheet-handle"></div>
     <div class="sheet-title">${firstRun ? 'Welcome. Tell us about you' : 'My details'}</div>
     <div class="sheet-sub">${firstRun ? 'Add what you can now. Everything is optional and you can change it any time.' : 'Only you and the doctors you approve can see these.'}</div>
     <div class="form-h" style="margin-top:0">About you</div>
@@ -843,6 +849,7 @@ function openProfileEditor(firstRun) {
     <button class="btn-ghost" style="margin-top:10px" id="pe-cancel">${firstRun ? 'Skip for now' : 'Cancel'}</button></div>`;
   document.body.appendChild(ov);
   ov.querySelector('#pe-cancel').onclick = () => ov.remove();
+  ov.querySelector('#pe-x').onclick = () => ov.remove();
   ov.querySelector('#pe-save').onclick = saveProfile;
 }
 async function saveProfile() {
