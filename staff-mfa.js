@@ -74,6 +74,7 @@
 
   function nudge() {
     try { if (sessionStorage.getItem('mf_nudge')) return; sessionStorage.setItem('mf_nudge', '1'); } catch (e) {}
+    ensureRoot();   // loads the stylesheet; without it the bar shows as plain unstyled text
     var bar = document.createElement('div'); bar.className = 'mf-bar';
     bar.innerHTML = '<span>Protect patient records: turn on two-factor sign-in.</span><button data-a="set">Set up</button><button class="x" data-a="x" aria-label="Dismiss">&times;</button>';
     bar.onclick = function (e) { var a = e.target.getAttribute && e.target.getAttribute('data-a'); if (a === 'set') { bar.remove(); openSettings(); } else if (a === 'x') bar.remove(); };
