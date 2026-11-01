@@ -979,6 +979,13 @@ tbody tr:hover td { background: var(--grey-50); cursor: pointer; }
         <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--ink2)">Slot (min)</div>
       </div>
       <div id="avail-rows"></div>
+      <div style="margin:18px 0 4px;padding:14px;border:1px solid var(--border);border-radius:10px">
+        <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+          <input type="checkbox" id="av-listed" style="margin-top:3px">
+          <span><b>Let patients find and book me</b><br>
+          <span style="font-size:12px;color:var(--ink2);line-height:1.5">Signed-in patients can see your name, speciality, HPCSA number, practice and open times, and book. Booking with you shares that patient's profile with you. Your practice location is set under Practice Settings. Switch this off any time.</span></span>
+        </label>
+      </div>
       <div class="form-actions">
         <button class="btn btn-ghost" onclick="closeM('m-availability')">Cancel</button>
         <button class="btn btn-primary" onclick="saveAvailability()">Save Availability</button>
@@ -2338,6 +2345,12 @@ async function openAvailability() {
     }
   }
   renderAvailRows();
+  const lb = document.getElementById('av-listed');
+  lb.checked = false; lb.dataset.was = '0';
+  if (S.docId) {
+    const { data: me } = await sbClient.from('doctors').select('listed').eq('id', S.docId).maybeSingle();
+    if (me && me.listed) { lb.checked = true; lb.dataset.was = '1'; }
+  }
   openM('m-availability');
 }
 
@@ -2392,7 +2405,12 @@ async function saveAvailability() {
     .upsert(rows, { onConflict: 'doctor_id,day_of_week' });
 
   if (error) { toast(error.message, 'error'); return; }
-  toast('Availability saved', 'success');
+  const lb = document.getElementById('av-listed');
+  if (lb && (lb.checked ? '1' : '0') !== lb.dataset.was) {
+    const { error: le } = await sbClient.rpc('set_my_listing', { p_listed: lb.checked });
+    if (le) { toast(le.message, 'error'); return; }
+  }
+  toast(lb && lb.checked ? 'Availability saved. Patients can now find and book you' : 'Availability saved', 'success');
   closeM('m-availability');
 }
 
