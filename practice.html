@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="staff-mfa.js"></script>
+<script src="staff-reset.js"></script>
 <style>
 /* ── TOKENS ──────────────────────────────────────────────── */
 :root {
@@ -651,6 +652,7 @@ const SUPABASE_URL='https://dlyghathovzjlhrcrhgg.supabase.co';
 const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 StaffMFA.init({sb});
+StaffReset.init({sb,passwordInput:'#lm-pass',emailInput:'#lm-email'});
 const DOMAIN='https://medconsult.africa';
 const PENDING_KEY='mc_pending_practice_reg';
 
