@@ -1,0 +1,15 @@
+/* MOBILE RULE: nothing sits 50/50 on a phone unless it opts in.
+   Under 600px every two-column grid collapses to one column.
+   To keep a split on mobile, add class "keep-split" to that element. */
+@media (max-width: 600px) {
+  .bento-split, .auth-2col, .plan-grid, .form-grid, .rx-patient-grid, .inv-parties,
+  .inv-aid-grid, .info-grid, .stats-grid, .qa-grid, .reg-row, .plan-includes,
+  .form-row, .includes-grid, .stat-row, .avail-week, .stats-inner, .persona-grid,
+  .testimonials-grid, .cost-grid, .footer-inner, .journey-strip, .portal-grid,
+  .consult-grid,
+  [style*="grid-template-columns:1fr 1fr"], [style*="grid-template-columns: 1fr 1fr"],
+  [style*="grid-template-columns:repeat(2"], [style*="grid-template-columns: repeat(2"] {
+    grid-template-columns: 1fr !important;
+  }
+  .keep-split { grid-template-columns: 1fr 1fr !important; }
+}
