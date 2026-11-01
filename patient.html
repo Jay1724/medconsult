@@ -485,6 +485,23 @@ body {
     <div class="field"><label>Email</label><input type="email" id="l-email" placeholder="your@email.com" autocomplete="email"></div>
     <div class="field"><label>Password</label><input type="password" id="l-pw" placeholder="••••••••" autocomplete="current-password"></div>
     <button class="btn-primary" id="login-btn" onclick="doLogin()">Sign In</button>
+    <div style="text-align:center;margin-top:14px"><a href="#" style="font-size:13px;color:var(--azure);text-decoration:none;font-weight:600" onclick="event.preventDefault();authTab('forgot')">Forgot your password?</a></div>
+  </div>
+  <!-- FORGOT PASSWORD -->
+  <div class="auth-panel" id="panel-forgot">
+    <div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:6px">Reset your password</div>
+    <p style="font-size:13px;color:var(--ink2);line-height:1.6;margin:0 0 16px">Enter the email you registered with. If it matches an account, we will email you a link to choose a new password.</p>
+    <div class="field"><label>Email</label><input type="email" id="f-email" placeholder="your@email.com" autocomplete="email"></div>
+    <button class="btn-primary" id="forgot-btn" onclick="doForgot()">Send reset link</button>
+    <button class="btn-ghost" style="margin-top:10px" onclick="authTab('login')">Back to sign in</button>
+  </div>
+  <!-- CHOOSE NEW PASSWORD (arrives from the email link) -->
+  <div class="auth-panel" id="panel-reset">
+    <div style="font-size:18px;font-weight:700;color:var(--ink);margin-bottom:6px">Choose a new password</div>
+    <p style="font-size:13px;color:var(--ink2);line-height:1.6;margin:0 0 16px">Use at least 8 characters.</p>
+    <div class="field"><label>New password</label><input type="password" id="n-pw" placeholder="Min 8 characters" autocomplete="new-password"></div>
+    <div class="field"><label>Confirm new password</label><input type="password" id="n-pw2" placeholder="Repeat password" autocomplete="new-password"></div>
+    <button class="btn-primary" id="reset-btn" onclick="doResetPassword()">Save password and sign in</button>
   </div>
   <!-- REGISTER -->
   <div class="auth-panel" id="panel-register">
@@ -630,7 +647,16 @@ ST.access = [];
     authTab('register');
     await validateToken(inviteToken);
   }
+  // Arriving from a reset-password email: ask for the new password before anything else.
+  const hash = location.hash || '';
+  const recovering = /type=recovery/.test(hash);
+  if (/error_code=|error=access_denied/.test(hash)) {
+    history.replaceState(null, '', location.pathname);
+    toast('That reset link has expired or was already used. Ask for a new one.', 'error');
+    authTab('forgot'); showAuth(); return;
+  }
   const { data: { session } } = await sb.auth.getSession();
+  if (recovering && session) { authTab('reset'); showAuth(); return; }
   if (session) {
     await loadPatient(session.user);
     bootApp();
@@ -667,10 +693,38 @@ function bootApp() {
 
 // ── AUTH ─────────────────────────────────────────────
 function authTab(t) {
-  ['login','register'].forEach((v,i) => {
+  ['login','register','forgot','reset'].forEach(v => {
     document.getElementById('panel-'+v).classList.toggle('active', v===t);
-    document.querySelectorAll('.auth-tab')[i].classList.toggle('active', v===t);
   });
+  document.querySelectorAll('.auth-tab').forEach((el, i) => el.classList.toggle('active', ['login','register'][i] === t));
+  document.querySelector('.auth-tabs').style.display = (t === 'forgot' || t === 'reset') ? 'none' : '';
+  if (t === 'forgot') { const le = document.getElementById('l-email').value.trim(); if (le) document.getElementById('f-email').value = le; }
+}
+
+async function doForgot() {
+  const email = document.getElementById('f-email').value.trim();
+  if (!email) { toast('Please enter your email', 'error'); return; }
+  setBtn('forgot-btn', 'Sending…', true);
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  setBtn('forgot-btn', 'Send reset link', false);
+  // Same message whether or not the email has an account, so nobody can use this to find out who is registered.
+  if (error && /rate|seconds|too many/i.test(error.message)) { toast('Please wait a minute before asking again', 'error'); return; }
+  toast('If that email has an account, a reset link is on its way. Check your inbox and spam folder.', 'success');
+  authTab('login');
+}
+
+async function doResetPassword() {
+  const pw = document.getElementById('n-pw').value, pw2 = document.getElementById('n-pw2').value;
+  if (pw.length < 8) { toast('Password must be at least 8 characters', 'error'); return; }
+  if (pw !== pw2)    { toast('Passwords do not match', 'error'); return; }
+  setBtn('reset-btn', 'Saving…', true);
+  const { data, error } = await sb.auth.updateUser({ password: pw });
+  if (error) { setBtn('reset-btn', 'Save password and sign in', false); toast(error.message, 'error'); return; }
+  history.replaceState(null, '', location.pathname);
+  toast('Password changed', 'success');
+  await loadPatient(data.user);
+  document.getElementById('auth-screen').style.display = 'none';
+  bootApp();
 }
 
 async function validateToken(token) {
