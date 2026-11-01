@@ -9,6 +9,7 @@
 <script src="medical-aid.js"></script>
 <script src="patient-access.js"></script>
 <script src="staff-mfa.js"></script>
+<script src="staff-reset.js"></script>
 <style>
 /* ── DESIGN TOKENS ──────────────────────────────────────── */
 :root {
@@ -1265,6 +1266,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // Invite patients / request access. A doctor sends requests for themselves.
 StaffMFA.init({ sb: sbClient });
+StaffReset.init({ sb: sbClient, passwordInput: '#l-pass', emailInput: '#l-email' });
 PatientAccess.init({ sb: sbClient, onOpenDoc: (kind, id) => {
   if (kind === 'sick_note') viewSN(id);
   else if (kind === 'prescription') viewRX(id);

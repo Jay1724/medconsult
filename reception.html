@@ -9,6 +9,7 @@
 <script src="medical-aid.js"></script>
 <script src="patient-access.js"></script>
 <script src="staff-mfa.js"></script>
+<script src="staff-reset.js"></script>
 <style>
 /* ── TOKENS ─────────────────────────────────────────────── */
 :root {
@@ -667,6 +668,7 @@ const SUPABASE_URL = 'https://dlyghathovzjlhrcrhgg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRseWdoYXRob3Z6amxocmNyaGdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNTQ4OTAsImV4cCI6MjA5MzgzMDg5MH0.PtSABDEYtPApwlqf64C2vfuK_mWZV1pVgIi_sEYJAxQ';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 StaffMFA.init({ sb });
+StaffReset.init({ sb, passwordInput: '#l-pass', emailInput: '#l-email' });
 // Invite patients / request access. Reception picks the doctor the request is for.
 PatientAccess.init({ sb, getDoctors: () => (R.doctors || []).map(d => ({ id: d.id, name: 'Dr. ' + d.first_name + ' ' + d.last_name })) });
 
