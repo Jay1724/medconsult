@@ -547,7 +547,10 @@ body {
       </div>
       <!-- APPOINTMENTS -->
       <div class="tab-panel" id="tab-appointments">
-        <button class="btn-primary" style="margin-bottom:16px" onclick="openBooking()">+ Book New Appointment</button>
+        <button class="btn-primary" style="margin-bottom:16px" onclick="openBooking()">+ Find a doctor and book</button>
+        <div class="section-hd">My doctors</div>
+        <div id="mydocs-body"></div>
+        <div class="section-hd">Appointments</div>
         <div id="appts-body"></div>
       </div>
       <!-- RECORDS -->
@@ -1003,6 +1006,7 @@ function noApptCard() {
 
 // ── APPOINTMENTS ─────────────────────────────────────
 async function loadAppointments() {
+  await loadMyDoctors();
   const el = document.getElementById('appts-body');
   if (!ST.account) { el.innerHTML = empty('calendar_today','No appointments','Book one using the button above'); return; }
   el.innerHTML = spinner();
@@ -1028,7 +1032,9 @@ async function loadAppointments() {
 function apptDoctor(a) {
   if (a.doctors) return { name: `Dr. ${a.doctors.first_name} ${a.doctors.last_name}`, spec: a.doctors.spec || '' };
   const g = (ST.access || []).find(x => x.dr_id === a.doctor_id);
-  return g ? { name: drLabel(g.dr_name), spec: g.dr_spec || '' } : { name: 'Doctor', spec: '' };
+  if (g) return { name: drLabel(g.dr_name), spec: g.dr_spec || '' };
+  const m = (ST.myDoctors || []).find(x => x.id === a.doctor_id);
+  return m ? { name: m.name.replace(/^Dr /, 'Dr. '), spec: m.spec || '' } : { name: 'Doctor', spec: '' };
 }
 
 function apptCard(a, past=false) {
@@ -1054,51 +1060,106 @@ function apptCard(a, past=false) {
 }
 
 // ── BOOKING ──────────────────────────────────────────
-function openBooking() {
-  bkStep = 1; bkDate = null; bkSlot = null;
-  renderBookStep();
+// Booking: pick a doctor type and place, see doctors with open times, choose a time.
+let bkDoc = null, bkSpec = '', bkPlace = '', bkLoc = null, bkResults = [], bkSpecs = null;
+
+function openBooking(docId) {
+  bkDate = null; bkSlot = null; bkDoc = null;
   document.getElementById('booking-overlay').classList.add('open');
+  const known = docId && (ST.myDoctors || []).find(d => d.id === docId);
+  if (known) { bkDoc = { id: known.id, name: known.name, spec: known.spec, practice: known.practice, known: known.access_status === 'approved' }; bkStep = 3; bkDate = isoDate(new Date()); }
+  else bkStep = 1;
+  renderBookStep();
 }
 function closeBooking() { document.getElementById('booking-overlay').classList.remove('open'); }
 function overlayTap(e) { if (e.target === document.getElementById('booking-overlay')) closeBooking(); }
+const fmtSlotDay = d => { const t = isoDate(new Date()); return d === t ? 'Today' : fmtDate(d); };
 
-function renderBookStep() {
+async function renderBookStep() {
   const el = document.getElementById('booking-body');
-  const today = isoDate(new Date());
   if (bkStep === 1) {
+    if (!bkSpecs) { const { data } = await sb.rpc('list_specialities'); bkSpecs = data || []; }
     el.innerHTML = `
-      <div class="sheet-title">Book Appointment</div>
-      <div class="sheet-sub">Step 1 of 2 — Pick a date</div>
-      <div class="step-dots"><div class="step-dot active"></div><div class="step-dot"></div></div>
-      <div class="field"><label>Date</label>
-        <input type="date" class="date-input" id="bk-date" min="${today}" value="${bkDate || today}">
-      </div>
-      <button class="btn-primary" onclick="goStep2()">See Available Slots →</button>
+      <div class="sheet-title">Find a doctor</div>
+      <div class="sheet-sub">Choose the type of doctor and where you want to see them</div>
+      <div class="field"><label>Type of doctor</label>
+        <select id="bk-spec"><option value="">Any doctor</option>${bkSpecs.map(x => `<option value="${esc(x)}"${x === bkSpec ? ' selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+      <div class="field"><label>Where</label>
+        <input id="bk-place" placeholder="Suburb or town, e.g. Roodepoort" value="${esc(bkPlace)}">
+        <button class="btn-ghost" style="margin-top:8px" id="bk-near" onclick="useMyLocation()">${bkLoc ? '✓ Using your location' : '📍 Use my location'}</button>
+        <div class="hint">Your location is used for this search only and is not saved.</div></div>
+      <button class="btn-primary" onclick="searchDoctors()">Show doctors</button>
       <button class="btn-ghost" style="margin-top:10px" onclick="closeBooking()">Cancel</button>`;
-  } else {
+  } else if (bkStep === 2) {
     el.innerHTML = `
-      <div class="sheet-title">Book Appointment</div>
-      <div class="sheet-sub">Step 2 of 2 — Pick a time on ${fmtDate(bkDate)}</div>
-      <div class="step-dots"><div class="step-dot done"></div><div class="step-dot active"></div></div>
+      <div class="sheet-title">Doctors${bkSpec ? ' · ' + esc(bkSpec) : ''}</div>
+      <div class="sheet-sub">${bkLoc ? 'Nearest first' : (bkPlace ? 'Around ' + esc(bkPlace) : 'All areas')}. Tap a time to book, or "More times".</div>
+      <div id="bk-results">${spinner()}</div>
+      <button class="btn-ghost" style="margin-top:10px" onclick="bkStep=1;renderBookStep()">← Change search</button>`;
+    renderDoctorResults();
+  } else {
+    const back = bkResults.length ? `bkStep=2;renderBookStep()` : 'closeBooking()';
+    el.innerHTML = `
+      <div class="sheet-title">${esc(bkDoc.name)}</div>
+      <div class="sheet-sub">${esc([bkDoc.spec, bkDoc.practice].filter(Boolean).join(' · '))}</div>
+      <div class="field"><label>Date</label><input type="date" class="date-input" id="bk-date" min="${isoDate(new Date())}" value="${bkDate || isoDate(new Date())}" onchange="bkDate=this.value;bkSlot=null;document.getElementById('bk-confirm').innerHTML='';loadSlots()"></div>
       <div id="slots-area">${spinner()}</div>
       <div id="bk-confirm"></div>
-      <button class="btn-ghost" style="margin-top:10px" onclick="bkStep=1;renderBookStep()">← Back</button>`;
+      <button class="btn-ghost" style="margin-top:10px" onclick="${back}">← Back</button>`;
     loadSlots();
   }
 }
 
-async function goStep2() {
-  bkDate = document.getElementById('bk-date').value;
-  if (!bkDate) { toast('Please pick a date', 'error'); return; }
-  if (!bkDoctorId) { toast('You can book once a doctor has your approved access', 'error'); return; }
+function useMyLocation() {
+  if (!navigator.geolocation) { toast('This browser cannot share a location. Type your suburb instead', 'error'); return; }
+  const b = document.getElementById('bk-near'); if (b) b.textContent = 'Finding you…';
+  navigator.geolocation.getCurrentPosition(
+    pos => { bkLoc = { lat: pos.coords.latitude, lng: pos.coords.longitude }; const pl = document.getElementById('bk-place'); if (pl) pl.value = ''; if (b) b.textContent = '✓ Using your location'; },
+    () => { bkLoc = null; if (b) b.textContent = '📍 Use my location'; toast('Could not get your location. Type your suburb instead', 'error'); },
+    { enableHighAccuracy: false, timeout: 12000 });
+}
+
+async function searchDoctors() {
+  bkSpec = document.getElementById('bk-spec').value;
+  bkPlace = document.getElementById('bk-place').value.trim();
+  if (bkPlace) bkLoc = null;
   bkStep = 2; renderBookStep();
+  const { data, error } = await sb.rpc('search_doctors', { p_spec: bkSpec || null, p_lat: bkLoc?.lat ?? null, p_lng: bkLoc?.lng ?? null, p_place: bkPlace || null });
+  if (error) { toast(error.message, 'error'); bkResults = []; } else bkResults = data || [];
+  if (bkStep === 2) renderDoctorResults();
+}
+
+function renderDoctorResults() {
+  const el = document.getElementById('bk-results'); if (!el) return;
+  if (!bkResults.length) { el.innerHTML = empty('search_off', 'No doctors found', 'Try a different type or area, or widen the search'); return; }
+  el.innerHTML = bkResults.map((d, i) => {
+    const where = [d.suburb, d.city].filter(Boolean).join(', ') || d.address || '';
+    const slots = (d.next_slots || []);
+    return `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+        <div><div style="font-size:15px;font-weight:700;color:var(--ink)">${esc(d.name)}</div>
+        <div style="font-size:12px;color:var(--ink2);margin-top:2px">${esc([d.spec, d.hpcsa ? 'HPCSA ' + d.hpcsa : ''].filter(Boolean).join(' · '))}</div></div>
+        ${d.distance_km != null ? `<div style="font-size:12px;font-weight:600;color:var(--azure);white-space:nowrap">${d.distance_km} km</div>` : ''}
+      </div>
+      <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px">${esc(d.practice || '')}${where ? ' · ' + esc(where) : ''}${d.known ? ' · <b>Your doctor</b>' : ''}</div>
+      ${slots.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${slots.map(sl => `<div class="slot-chip" style="flex:1;min-width:92px" onclick="chooseDoctorSlot(${i},'${sl.date}','${sl.time}')">${esc(fmtSlotDay(sl.date))}<br>${esc(sl.time)}</div>`).join('')}</div>`
+                    : `<div style="font-size:12px;color:var(--ink3)">No open times in the next two weeks</div>`}
+      <button class="doc-view-btn" style="margin-top:10px" onclick="chooseDoctorSlot(${i})">More times</button>
+    </div>`;
+  }).join('');
+}
+
+function chooseDoctorSlot(i, date, time) {
+  bkDoc = bkResults[i]; bkDate = date || isoDate(new Date()); bkSlot = null; bkStep = 3;
+  renderBookStep().then(() => { if (time) setTimeout(() => { const chip = [...document.querySelectorAll('#slots-area .slot-chip')].find(c => c.textContent.trim() === time); if (chip) chip.click(); }, 400); });
 }
 
 async function loadSlots() {
-  const { data, error } = await sb.rpc('get_available_slots', { p_doctor_id: bkDoctorId, p_date: bkDate });
   const el = document.getElementById('slots-area');
+  const { data, error } = await sb.rpc('get_available_slots', { p_doctor_id: bkDoc.id, p_date: bkDate });
+  if (!el) return;
   if (error || !data || !data.length) {
-    el.innerHTML = empty('schedule','No available slots','The doctor has no openings on this day — try another date');
+    el.innerHTML = empty('schedule', 'No available times', 'Nothing open on this day. Try another date');
     return;
   }
   el.innerHTML = `<div class="slots-grid">${data.map(s => {
@@ -1111,32 +1172,57 @@ function pickSlot(t, el) {
   document.querySelectorAll('.slot-chip').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   bkSlot = t;
+  const share = bkDoc.known ? '' : `
+    <label style="display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--ink2);line-height:1.5;margin:0 0 14px;cursor:pointer">
+      <input type="checkbox" id="bk-share" style="margin-top:3px">
+      <span>I allow ${esc(bkDoc.name)} to see my profile and medical record. I can see who looks at it, and revoke this at any time under Profile.</span></label>`;
   document.getElementById('bk-confirm').innerHTML = `
     <div style="margin-top:16px;padding:14px;background:var(--azure-dim);border-radius:var(--radius-sm);font-size:13px;color:var(--azure);font-weight:600;margin-bottom:14px">
-      ${fmtDate(bkDate)} at ${t}
+      ${esc(bkDoc.name)} · ${fmtDate(bkDate)} at ${t}
     </div>
-    <input type="text" class="reason-input" id="bk-reason" placeholder="Reason for visit (optional)">
-    <button class="btn-primary" onclick="confirmBooking()">Confirm Booking</button>`;
+    <input type="text" class="reason-input" id="bk-reason" placeholder="Reason for visit (optional)" maxlength="300">
+    ${share}
+    <button class="btn-primary" id="bk-go" onclick="confirmBooking()">Confirm Booking</button>`;
+  document.getElementById('bk-confirm').scrollIntoView({ behavior: 'smooth', block: 'end' });
 }
 
 async function confirmBooking() {
   if (!bkSlot) { toast('Please select a time', 'error'); return; }
   const reason = document.getElementById('bk-reason')?.value?.trim() || '';
-  const { error } = await sb.from('appointments').insert({
-    doctor_id:   bkDoctorId,
-    patient_id:  ST.account.patient_id,
-    appt_date:   bkDate,
-    appt_time:   bkSlot,
-    type:        'In-Person',
-    status:      'Pending',
-    reason,
-    booked_by:   'patient',
-  });
-  if (error) { toast(error.message, 'error'); return; }
+  const shareBox = document.getElementById('bk-share');
+  if (shareBox && !shareBox.checked) { toast('Please tick the box to share your profile with this doctor', 'error'); return; }
+  setBtn('bk-go', 'Booking…', true);
+  const { error } = await sb.rpc('book_appointment', { p_doctor: bkDoc.id, p_date: bkDate, p_time: bkSlot, p_reason: reason || null, p_share: !!shareBox?.checked || !!bkDoc.known });
+  if (error) { setBtn('bk-go', 'Confirm Booking', false); toast(error.message, 'error'); if (/taken/i.test(error.message)) loadSlots(); return; }
   toast('Appointment booked!', 'success');
   closeBooking();
-  loadAppointments();
-  loadNextAppt();
+  await loadAccess(); loadAppointments(); loadNextAppt();
+}
+
+// ── MY DOCTORS ───────────────────────────────────────
+async function loadMyDoctors() {
+  const el = document.getElementById('mydocs-body'); if (!el) return;
+  const { data } = await sb.rpc('list_my_doctors');
+  ST.myDoctors = data || [];
+  if (!ST.myDoctors.length) {
+    el.innerHTML = `<div class="card" style="margin-bottom:16px"><div style="font-size:13px;color:var(--ink2);line-height:1.6">You have no doctors yet. Use <b>Find a doctor</b> to book with one, or accept a request from your own doctor.</div></div>`;
+    return;
+  }
+  el.innerHTML = ST.myDoctors.map(d => {
+    const pending = d.access_status === 'pending';
+    const sub = [d.spec, d.practice].filter(Boolean).map(esc).join(' · ');
+    const note = d.next_appt ? `Next: ${esc(fmtDate(d.next_appt.date))} at ${esc(d.next_appt.time)}`
+               : d.last_visit ? `Last visit ${esc(fmtDate(d.last_visit))}` : '';
+    return `<div class="card" style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:160px">
+        <div style="font-size:14px;font-weight:700;color:var(--ink)">${esc(d.name)}</div>
+        ${sub ? `<div style="font-size:12px;color:var(--ink2);margin-top:2px">${sub}</div>` : ''}
+        <div style="font-size:12px;color:var(--ink3);margin-top:2px">${pending ? 'Waiting for your approval to see your record' : d.access_status === 'approved' ? 'Can see your record' : 'No access to your record'}${note ? ' · ' + note : ''}</div>
+      </div>
+      ${pending ? `<button class="doc-view-btn" onclick="switchTab('profile')">Review</button>`
+        : d.can_book ? `<button class="doc-view-btn" style="background:var(--azure);color:#fff" onclick="openBooking('${d.id}')">Book</button>` : ''}
+    </div>`;
+  }).join('');
 }
 
 // ── RECORDS ──────────────────────────────────────────

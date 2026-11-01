@@ -783,7 +783,7 @@ async function completePendingSetup(user,reg){
     }});
     if(pe) throw pe;
     const {data:practice,error:ge}=await sb.from('practices')
-      .select('id,name,address,phone,email,hpcsa_number,vat_number,bank_account:bank_details,plan,trial_ends_at,created_at')
+      .select('id,name,address,phone,email,hpcsa_number,vat_number,bank_account:bank_details,plan,trial_ends_at,created_at,suburb,city,lat,lng')
       .eq('id',practiceId).single();
     if(ge) throw ge;
     const {data:me}=await sb.from('doctors').select('id').eq('auth_id',user.id).order('created_at').limit(1).single();
@@ -1101,6 +1101,18 @@ async function loadSettings(){
     </div>
     <div class="form-field"><label>Address</label><input type="text" id="set-addr" value="${esc(p?.address||'')}"></div>
     <div class="form-row">
+      <div class="form-field"><label>Suburb</label><input type="text" id="set-suburb" value="${esc(p?.suburb||'')}" placeholder="e.g. Wilgeheuwel"></div>
+      <div class="form-field"><label>Town / City</label><input type="text" id="set-city" value="${esc(p?.city||'')}" placeholder="e.g. Roodepoort"></div>
+    </div>
+    <div class="form-field">
+      <label>Map location <span style="font-weight:400;color:var(--ink3)">(lets patients find you by distance)</span></label>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="useThisLocation()">📍 Use this device's location</button>
+        <span id="set-loc-status" style="font-size:12px;color:var(--ink2)">${p?.lat!=null?'Location saved. Press the button again while at the practice to update it.':'Not set. Do this on a phone or laptop while you are at the practice.'}</span>
+      </div>
+      <input type="hidden" id="set-lat" value="${p?.lat??''}"><input type="hidden" id="set-lng" value="${p?.lng??''}">
+    </div>
+    <div class="form-row">
       <div class="form-field"><label>Practice Email</label><input type="email" id="set-email" value="${esc(p?.email||'')}"></div>
       <div class="form-field"><label>HPCSA Practice Number</label><input type="text" id="set-hpcsa" value="${esc(p?.hpcsa_number||'')}"></div>
     </div>
@@ -1119,6 +1131,16 @@ async function loadSettings(){
     </div>
     <div class="field-error" id="settings-err" style="text-align:right;margin-top:8px"></div>`;
 }
+function useThisLocation(){
+  const st=document.getElementById('set-loc-status');
+  if(!navigator.geolocation){st.textContent='This browser cannot share a location.';return}
+  st.textContent='Finding your location…';
+  navigator.geolocation.getCurrentPosition(pos=>{
+    document.getElementById('set-lat').value=pos.coords.latitude.toFixed(5);
+    document.getElementById('set-lng').value=pos.coords.longitude.toFixed(5);
+    st.textContent='Location captured. Press Save Changes to keep it.';
+  },()=>{st.textContent='Could not get the location. Allow location access and try again.'},{enableHighAccuracy:true,timeout:15000});
+}
 async function saveSettings(){
   const updates={
     name:document.getElementById('set-name').value.trim(),
@@ -1134,7 +1156,11 @@ async function saveSettings(){
   const {error}=await sb.from('practices').update(updates).eq('id',ST.practice?.id);
   btn.disabled=false;btn.textContent='Save Changes';
   if(error){document.getElementById('settings-err').textContent=error.message;return;}
-  Object.assign(ST.practice,updates,{bank_account:updates.bank_details});
+  const latv=document.getElementById('set-lat').value,lngv=document.getElementById('set-lng').value;
+  const loc={suburb:document.getElementById('set-suburb').value.trim(),city:document.getElementById('set-city').value.trim(),lat:latv===''?null:Number(latv),lng:lngv===''?null:Number(lngv)};
+  const {error:le}=await sb.rpc('set_practice_location',{p_practice:ST.practice.id,p_suburb:loc.suburb,p_city:loc.city,p_lat:loc.lat,p_lng:loc.lng});
+  if(le){document.getElementById('settings-err').textContent=le.message;return;}
+  Object.assign(ST.practice,updates,loc,{bank_account:updates.bank_details});
   document.getElementById('sb-practice-name').textContent=updates.name;
   toast('Practice settings saved','success');
 }
